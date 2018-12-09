@@ -36,17 +36,20 @@ filter_default = 0
 # To show all items, set `tag` to "*".
 # To filter by a specific tag, set `tag` to an existing tag name.
 # To remove toolbar, delete/comment all instances of `[[filter]]` below.
-[[filter]]
-  name = "All"
-  tag = "*"
 
-[[filter]]
-  name = "Deep Learning"
-  tag = "Deep Learning"
+### this below will be commented out 
 
-[[filter]]
-  name = "Other"
-  tag = "Demo"
+#[[filter]]
+ # name = "All"
+  #tag = "*"
+
+#[[filter]]
+ # name = "Deep Learning"
+  #tag = "Deep Learning"
+
+#[[filter]]
+ # name = "Other"
+  #tag = "Demo"
 
 +++
 

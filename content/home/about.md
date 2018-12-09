@@ -35,5 +35,5 @@ weight = 5
 
 # Biography
 
-I work as a Statistician with Baylor College of Medicine. My work primarily revolves around anaylyzing EHR data collected from the Baylor International Pediatrics AIDS initiative (BIPAI) clinics in sub-saharan Africa. In addition, I work with clinicians 
+I work as a Statistician with Baylor College of Medicine. My work primarily revolves around anaylyzing EHR data collected from the Baylor International Pediatrics AIDS initiative (BIPAI) clinics in sub-saharan Africa. In addition, I work with clinicians working to understand  
 
