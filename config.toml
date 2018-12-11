@@ -60,7 +60,7 @@ enableGitInfo = true
   organizations = [ { name = "Baylor College of Medicine", url = "" } ]
 
   gravatar = false  # Get your avatar from Gravatar.com? (true/false)
-  avatar = "IMG_6588.jpg"  # Specify an avatar image (in `static/img/` folder) or delete value to disable avatar.
+  avatar = "IMG_6578.jpg"  # Specify an avatar image (in `static/img/` folder) or delete value to disable avatar.
 
   # Details for the Contact Widget
   email = "dhillon88@tamu.edu"
