@@ -21,22 +21,32 @@ weight = 7
 # * fab - Font Awesome brand icons (see https://fontawesome.com/icons)
 # * ai - academic icons (see https://jpswalsh.github.io/academicons/)
 
-[[feature]]
+#[[feature]]
   icon = "r-project"
   icon_pack = "fab"
   name = "R"
-  description = "90%"
+  description = "Data wrangling, Implementing statistical methods, Machine learning"
   
 [[feature]]
   icon = "chart-line"
   icon_pack = "fas"
-  name = "Statistics"
-  description = "100%"  
+  name = "Multivariate Regression"
+  description = "Regularized regression methods, tree-based regression techniques, time series regression, mixed effects modeling"  
   
 [[feature]]
-  icon = "camera-retro"
+  icon = "file-medical-alt"
   icon_pack = "fas"
-  name = "Photography"
-  description = "10%"
+  name = "Clinical Statisitcs"
+  description = "Design of clinical trials, survival analysis of censored data, analysis of longitudinal data, imputation techniques for missing data"
+
+
+[[feature]]
+  icon = "code-branch"
+  icon_pack = "fas"
+  name = "Data wrangling and Management"
+  description = "Data ‘tidying’ and management using *tidyverse*, *data.table*, *pandas* and *numpy* libraries in R andPython Visualization techniques using ggplot and seaborno Parallel computing in R to execute programs for implementing computationally intensive procedureso Enabling reproducible analysis and documentation using R markdown and jupyter notebookso Version control using github"
+  
+  
+  
 
 +++

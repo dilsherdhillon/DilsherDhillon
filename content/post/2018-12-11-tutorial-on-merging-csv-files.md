@@ -3,8 +3,8 @@ title: 'Tutorial on Merging CSV files '
 author: Dilsher Dhillon
 date: '2018-12-11'
 slug: tutorial-on-merging-csv-files
-categories: []
-tags: []
+categories: [Data wrangling]
+tags: [Python]
 image:
   caption: ''
   focal_point: ''
