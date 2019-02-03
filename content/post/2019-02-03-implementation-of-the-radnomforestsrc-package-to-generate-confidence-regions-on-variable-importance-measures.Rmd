@@ -1,0 +1,294 @@
+---
+title: Implementation of the randomForestSRC package to generate confidence regions
+  on variable importance measures
+author: 'Dilsher Dhillon'
+date: '2019-02-03'
+slug: implementation-of-the-randomforestsrc-package-to-generate-confidence-regions-on-variable-importance-measures
+categories: [R]
+tags: []
+image:
+  caption: ''
+  focal_point: ''
+---
+
+
+At a recent data science meetup in Houston, I spoke to one of the panel speakers who was a data scientist for an oil and gas consulting company. They mostly used tree based methods like *random forest*, *bagging* and *boosting* and one of the challenges he said they frequently encountered while presenting their results, were putting confidence intervals on the variable importance measures. 
+
+Often times, industry experts would not only like good predictive models but at the same time, models that are somewhat interpretable. It reminds me of a very useful graphic from the [ISLR book](http://www-bcf.usc.edu/~gareth/ISL/) (*An excellent book by the way for anyone who hasn't yet read it*) 
+
+![*From ISLR*](/img/interpVsPred.png)
+
+As you can see, tree based methods are highly flexible (and thus, potential to have better predictions) but low on the interpretability scale. 
+
+I sought out to look for recent papers and techniques to try to interpret random forest algorithms. A recent publication by Dr. Hemant Ishwaran sought out to do just this https://onlinelibrary.wiley.com/doi/abs/10.1002/sim.7803 
+
+Below I'll be implementing the techniques in this paper using the randomForestSRC package on the ever famous Ames housing dataset!
+
+
+
+Import the required libraries 
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(naniar)
+library(caret)
+library(e1071)
+library(ranger)
+library(corrplot)
+```
+
+Import the training data (downloaded from [kaggle] https://www.kaggle.com/datasets) 
+
+```{r message=FALSE, warning=FALSE}
+train <- read_csv("/Users/dilsherdhillon/Documents/Website/DilsherDhillon/static/files/train.csv")
+```
+
+The package [naniar](https://github.com/njtierney/naniar) provides a nice feature which can be utilized to visualize completeness of data in one simple line of code
+
+```{r fig.height=8, fig.width=8}
+gg_miss_var(train,show_pct = TRUE)
+
+## Other functions that maybe useful for your specific problem
+#vis_miss(train,show_perc_col = TRUE,warn_large_data = TRUE)
+#vis_miss(train,show_perc_col = TRUE,warn_large_data = TRUE)
+#miss_case_table(train)
+```
+
+
+
+The plot shows ~17% data missing for 'Lot Frontage', and 'Alley','PoolQC','Fence' and 'MiscFeatures' are missing >70% of their data. About ~48% of the 'FireplaceQU' variable is missing. 
+
+At this point it would suffice to say we should remove all these variables except lot frontage. Since this tutorial is more focused towards showcasing how to put confidence intervals on variable importance for RandomForest models, we'll work with data that is complete and not worry too much about data imputation etc. 
+
+
+*For imputation of missing data, the MICE package in R and the [corresponding text](https://stefvanbuuren.name/fimd/sec-simplesolutions.html) serves as a excellent resource for the interested reader* 
+
+Remove variables with high % of missing data 
+```{r}
+dta<-train%>%
+  select(-c(Alley,FireplaceQu,PoolQC,Fence,MiscFeature,Id,LotFrontage))
+```
+
+#### Near Zero Variance Predictors  
+
+Before we start implementing the random forest model, it's a good idea to run some quality checks on the variables. We know how the saying goes, *garbage in, garbage out*. One of these is checking for variables that have near zero variance - they are essentially the same for all samples and would simply add unwanted noise to our model. 
+
+The `caret` package has a nice function that lets us check for variables that may have zero or near zero variance 
+
+```{r}
+nzv<-nearZeroVar(dta,saveMetrics = TRUE)
+nzv
+dim(nzv)
+```
+
+
+There seem to be predictors with very low variance - we use the default metrics here to assesss whether we classify a predictor as near zero-variance or not 
+
+```{r}
+nzv<-nearZeroVar(dta) ## don't save metrics here since we need the index of the near zero variance variables
+dta_v2<-dta[,-nzv]
+dim(dta_v2)
+```
+
+**20 variables with near zero variance were removed**  
+
+
+
+Another quick measure we should look at is multi-collinearity.  
+Check for correlations between the numeric variables to avoid multi-collinearity issues  
+
+```{r fig.height=6, fig.width=7}
+dta_v2%>%
+  select_if(.,is.integer)%>%
+  cor(.,use="pairwise.complete.obs",method="spearman")%>%
+    corrplot(., type = "upper",method="circle",title="Spearman  Correlation",mar=c(0,0,1,0),number.cex = .2)
+
+```
+
+Some very interesting things come out from the plot above. We see that the variable 'YearBuilt' is very highly correlated with 'GarageYrBuilt' - which makes sense. It's likely that the garage for the house was built as the same time as the house was built. Similarly, GarageCars is highly correlated with GarageArea which again makes sense - more the area, more cars can be parked in the garage. 
+
+An encouraging thing that does come out is several of the variables are somewhat moderate to high correlated with the sale price. 
+
+
+We see that there are some variables that are actually categorical in nature, but are treated as integers/numbers - they should really be converted to categorical variables. For example, MoSold is the month of the year in which the house was sold from 1... through 12. 
+In addition, the character vectors need to be converted to factors as well to be used in the random forest model. 
+
+```{r}
+dta_v2<-dta_v2%>%
+  mutate_at(.,vars(MSSubClass,MoSold,BsmtFullBath,BsmtHalfBath,FullBath,HalfBath,YrSold),as.factor)%>%
+  map_if(is.character,as.factor)%>%
+  as.tibble()
+
+```
+
+
+
+
+How many predictors have correlation >0.80?  
+```{r}
+dta_v2%>%
+  select_if(.,is.integer)%>%
+  cor(.,method="spearman",use="pairwise.complete.obs")%>%
+  findCorrelation(.,cutoff = 0.80)
+```
+
+
+How many have >0.90  
+
+```{r}
+dta_v2%>%
+  select_if(.,is.integer)%>%
+  cor(.,method="spearman",use="pairwise.complete.obs")%>%
+  findCorrelation(.,cutoff = 0.90)
+```
+
+
+*No predictors have correlation >0.90* 
+
+
+A random forest model for training in `caret` needs complete data - in cases where the specified method can handle missing data, using the argument 'na.action=na.pass' in the train function (look up documentation in `caret` to which models can work with missing date)
+
+But for our purposes, we drop all cases with any missing values
+```{r}
+dta_rf<-dta_v2%>%
+  drop_na()
+dim(dta_rf)
+```
+
+
+We're down to 1339 samples from 1460 originally 
+
+
+Let's fit a *vanilla* random forest model. The default option in `caret` runs the specified model over 25 bootstrap samples across 3 options of the `mtry` tuning parameter. 
+
+```{r}
+rf_vanilla<-train(log(SalePrice)~.,method="ranger",data=dta_rf)
+rf_vanilla
+```
+
+
+The above was a 'vanilla' model, let's finetune the model by trying out different values of the hyperparameters
+
+```{r}
+tuning<-expand.grid(mtry = c(90:110),
+                      splitrule = c("variance"),
+                      min.node.size = c(3:8))
+fit_control<-trainControl(method = "oob",number = 5) ## out of bag estimation for computational efficiency 
+rf_upgrade<-train(log(SalePrice)~.,method="ranger",data=dta_rf,trControl=fit_control,tuneGrid=tuning)
+plot(rf_upgrade)
+
+```
+
+
+*The final values used for the model were mtry = 93, splitrule = variance and min.node.size = 3.*
+
+We will use the optimal paramters to fit a random forest model and assess variable importance and put confidence intervals on the variables
+
+```{r}
+library(randomForestSRC)
+```
+
+
+
+```{r}
+dta_v3<-dta_rf%>%
+ mutate(SalePrice=log(SalePrice))
+
+rf_ciMod<-rfsrc(SalePrice ~ .,data=as.data.frame(dta_v3),mtry = 93,nodesize = 3)
+## Print the variable importance 
+#var_imp<-vimp(rf_ciMod)
+#print(vimp(rf_ciMod))
+```
+
+### Variable Importance 
+
+The bootstrap is a popular method that can be used for estimating the variance of an estimator. So why not use the boot- strap to estimate the standard error for VIMP? One problem is that running a bootstrap on a forest is computationally expensive. Another more serious problem, however, is that a direct application of the bootstrap will not work for VIMP. This is because RF trees already use bootstrap data and applying the bootstrap creates double‐bootstrap data that affects the coherence of being OOB(out of bag). 
+
+A solution to this problem was given by a *0.164 bootstrap estimator*, which is careful to only use OOB data. However, A problem with the .164 bootstrap estimator is that its OOB data set is smaller than a typical OOB estimator. Truly OOB data from a double bootstrap can be less than half the size of OOB data used in a standard VIMP calculation (16.4% versus 36.8%). Thus, in a forest of 1000 trees, the .164 estimator uses about 164 trees on average to calculate VIMP for a case compared with 368 trees used in a standard calculation. This can reduce efficiency of the .164 estimator. Another problem is computational expense. The .164 estimator requires repeatedly fitting RF to bootstrap data, which becomes expensive as n increases 
+
+The paper I referenced above has a another solution for this called *sub sampling*. The idea rests on calculating VIMP over small iid subsets of the data. Because sampling is without replacement, this avoid ties in the OOB data that creates problems for the bootstrap. Also, because each calculation is fast, the procedure is computation- ally efficient, especially in big *n* settings.
+
+
+We've fit a random forest model above `rf_ciMod` using the `randomForestSRC` package functions- now we caclulate the variable importance. 
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+rf_sub<-subsample(rf_ciMod,B=100,subratio = 0.03)  
+
+# B is the size of each bootstrap sub sample and the subratio is typically the inverse of the square root of the sample size
+```
+
+`rf_sub` contains point estimates as well as the bootstrap estimates 
+
+```{r fig.height=6, fig.width=4}
+var_imps<-as.data.frame(rf_sub$vmp)
+var_imps$Predictors<-rownames(var_imps)
+var_imps%>%
+  ggplot(.,aes(y=reorder(Predictors,SalePrice),x=SalePrice))+geom_point(stat = "identity")+ labs(y="Variable Importance")
+```
+
+### How to extract the bootstrap estimates?  
+The object `rf_sub` contains the bootstrap estimates for all predictors in the list `vmpS` 
+
+```{r}
+boots<-rf_sub$vmpS
+## how to bind all the bootstraps into one df ?
+
+## Create an empty list 
+boots_2<-vector("list",100)
+for (i in 1:length(boots_2)){
+  boots_2[[i]]<-t(as.data.frame(boots[i]))
+}
+
+# Bind all the rows in a dataframe 
+boot_df<-do.call(rbind,boots_2)
+rownames(boot_df)<-seq(1,100,by=1)
+boot_df<-as.tibble(boot_df)
+
+boot_df<-boot_df%>%
+  mutate(`1stFlrSF`=X1stFlrSF,`2ndFlrSF`=X2ndFlrSF)%>%
+  select(-c(X1stFlrSF,X2ndFlrSF))
+
+```
+
+`boot_df` now contains all the bootstrap estimates in a convenient dataframe 
+```{r}
+head(boot_df)
+```
+
+
+##### Calculate lower and upper quantiles 
+
+```{r}
+
+cis<-boot_df%>%
+  gather(var,value,MSSubClass:SaleCondition)%>%
+  group_by(var)%>%
+  summarise(lower_ci=quantile(value,0.025,na.rm = TRUE),
+            upper_ci=quantile(value,0.975,na.rm=TRUE))
+
+
+
+ci_data<-var_imps%>%
+  mutate(var=Predictors,importance=SalePrice)%>%
+  select(-c(Predictors,SalePrice))%>%
+  inner_join(.,cis)
+
+```
+
+
+##### Plot confidence regions 
+```{r fig.height=6}
+ci_data%>%
+  ggplot(.,aes(x=reorder(var,importance),y=importance))+geom_point(stat = "identity")+ labs(y="Variable Importance",x="Predictors")+geom_errorbar(aes(ymin=lower_ci, ymax=upper_ci), colour="black", width=.1)+coord_flip()
+
+```
+
+And here we have it  - 95% confidence intervals for the importance measures for all the predictors. 
+
+We note that 'OverallQual', 'GrLivArea' and 'Yearbuilt' do not contain zero in their confidence interval. Even though p-values and the frequentist interpretation of confidence intervals is often mis-used in both academic and business settings, but if it's done in an appropriate manner and setting, it provides the end user with a better interpretation of the model as compared to one without confidence intervals. 
+
+ 
+![And that's it, folks!](/img/thats_it.jpg)
+
+
+
+

@@ -1,0 +1,315 @@
+---
+title: Implementation of the randomForestSRC package to generate confidence regions
+  on variable importance measures
+author: 'Dilsher Dhillon'
+date: '2019-02-03'
+slug: implementation-of-the-randomforestsrc-package-to-generate-confidence-regions-on-variable-importance-measures
+categories: [R]
+tags: []
+image:
+  caption: ''
+  focal_point: ''
+---
+
+
+
+<p>At a recent data science meetup in Houston, I spoke to one of the panel speakers who was a data scientist for an oil and gas consulting company. They mostly used tree based methods like <em>random forest</em>, <em>bagging</em> and <em>boosting</em> and one of the challenges he said they frequently encountered while presenting their results, were putting confidence intervals on the variable importance measures.</p>
+<p>Often times, industry experts would not only like good predictive models but at the same time, models that are somewhat interpretable. It reminds me of a very useful graphic from the <a href="http://www-bcf.usc.edu/~gareth/ISL/">ISLR book</a> (<em>An excellent book by the way for anyone who hasn’t yet read it</em>)</p>
+<div class="figure">
+<img src="/img/interpVsPred.png" alt="From ISLR" />
+<p class="caption"><em>From ISLR</em></p>
+</div>
+<p>As you can see, tree based methods are highly flexible (and thus, potential to have better predictions) but low on the interpretability scale.</p>
+<p>I sought out to look for recent papers and techniques to try to interpret random forest algorithms. A recent publication by Dr. Hemant Ishwaran sought out to do just this <a href="https://onlinelibrary.wiley.com/doi/abs/10.1002/sim.7803" class="uri">https://onlinelibrary.wiley.com/doi/abs/10.1002/sim.7803</a></p>
+<p>Below I’ll be implementing the techniques in this paper using the randomForestSRC package on the ever famous Ames housing dataset!</p>
+<p>Import the required libraries</p>
+<pre class="r"><code>library(tidyverse)
+library(naniar)
+library(caret)
+library(e1071)
+library(ranger)
+library(corrplot)</code></pre>
+<p>Import the training data (downloaded from [kaggle] <a href="https://www.kaggle.com/datasets" class="uri">https://www.kaggle.com/datasets</a>)</p>
+<pre class="r"><code>train &lt;- read_csv(&quot;/Users/dilsherdhillon/Documents/Website/DilsherDhillon/static/files/train.csv&quot;)</code></pre>
+<p>The package <a href="https://github.com/njtierney/naniar">naniar</a> provides a nice feature which can be utilized to visualize completeness of data in one simple line of code</p>
+<pre class="r"><code>gg_miss_var(train,show_pct = TRUE)</code></pre>
+<p><img src="/post/2019-02-03-implementation-of-the-radnomforestsrc-package-to-generate-confidence-regions-on-variable-importance-measures_files/figure-html/unnamed-chunk-3-1.png" width="768" /></p>
+<pre class="r"><code>## Other functions that maybe useful for your specific problem
+#vis_miss(train,show_perc_col = TRUE,warn_large_data = TRUE)
+#vis_miss(train,show_perc_col = TRUE,warn_large_data = TRUE)
+#miss_case_table(train)</code></pre>
+<p>The plot shows ~17% data missing for ‘Lot Frontage’, and ‘Alley’,‘PoolQC’,‘Fence’ and ‘MiscFeatures’ are missing &gt;70% of their data. About ~48% of the ‘FireplaceQU’ variable is missing.</p>
+<p>At this point it would suffice to say we should remove all these variables except lot frontage. Since this tutorial is more focused towards showcasing how to put confidence intervals on variable importance for RandomForest models, we’ll work with data that is complete and not worry too much about data imputation etc.</p>
+<p><em>For imputation of missing data, the MICE package in R and the <a href="https://stefvanbuuren.name/fimd/sec-simplesolutions.html">corresponding text</a> serves as a excellent resource for the interested reader</em></p>
+<p>Remove variables with high % of missing data</p>
+<pre class="r"><code>dta&lt;-train%&gt;%
+  select(-c(Alley,FireplaceQu,PoolQC,Fence,MiscFeature,Id,LotFrontage))</code></pre>
+<div id="near-zero-variance-predictors" class="section level4">
+<h4>Near Zero Variance Predictors</h4>
+<p>Before we start implementing the random forest model, it’s a good idea to run some quality checks on the variables. We know how the saying goes, <em>garbage in, garbage out</em>. One of these is checking for variables that have near zero variance - they are essentially the same for all samples and would simply add unwanted noise to our model.</p>
+<p>The <code>caret</code> package has a nice function that lets us check for variables that may have zero or near zero variance</p>
+<pre class="r"><code>nzv&lt;-nearZeroVar(dta,saveMetrics = TRUE)
+nzv</code></pre>
+<pre><code>##                 freqRatio percentUnique zeroVar   nzv
+## MSSubClass       1.792642     1.0273973   FALSE FALSE
+## MSZoning         5.279817     0.3424658   FALSE FALSE
+## LotArea          1.041667    73.4931507   FALSE FALSE
+## Street         242.333333     0.1369863   FALSE  TRUE
+## LotShape         1.911157     0.2739726   FALSE FALSE
+## LandContour     20.809524     0.2739726   FALSE  TRUE
+## Utilities     1459.000000     0.1369863   FALSE  TRUE
+## LotConfig        4.000000     0.3424658   FALSE FALSE
+## LandSlope       21.261538     0.2054795   FALSE  TRUE
+## Neighborhood     1.500000     1.7123288   FALSE FALSE
+## Condition1      15.555556     0.6164384   FALSE FALSE
+## Condition2     240.833333     0.5479452   FALSE  TRUE
+## BldgType        10.701754     0.3424658   FALSE FALSE
+## HouseStyle       1.631461     0.5479452   FALSE FALSE
+## OverallQual      1.061497     0.6849315   FALSE FALSE
+## OverallCond      3.257937     0.6164384   FALSE FALSE
+## YearBuilt        1.046875     7.6712329   FALSE FALSE
+## YearRemodAdd     1.835052     4.1780822   FALSE FALSE
+## RoofStyle        3.989510     0.4109589   FALSE FALSE
+## RoofMatl       130.363636     0.5479452   FALSE  TRUE
+## Exterior1st      2.319820     1.0273973   FALSE FALSE
+## Exterior2nd      2.355140     1.0958904   FALSE FALSE
+## MasVnrType       1.941573     0.2739726   FALSE FALSE
+## MasVnrArea     107.625000    22.3972603   FALSE FALSE
+## ExterQual        1.856557     0.2739726   FALSE FALSE
+## ExterCond        8.780822     0.3424658   FALSE FALSE
+## Foundation       1.020505     0.4109589   FALSE FALSE
+## BsmtQual         1.050162     0.2739726   FALSE FALSE
+## BsmtCond        20.169231     0.2739726   FALSE  TRUE
+## BsmtExposure     4.312217     0.2739726   FALSE FALSE
+## BsmtFinType1     1.028708     0.4109589   FALSE FALSE
+## BsmtFinSF1      38.916667    43.6301370   FALSE FALSE
+## BsmtFinType2    23.259259     0.4109589   FALSE  TRUE
+## BsmtFinSF2     258.600000     9.8630137   FALSE  TRUE
+## BsmtUnfSF       13.111111    53.4246575   FALSE FALSE
+## TotalBsmtSF      1.057143    49.3835616   FALSE FALSE
+## Heating         79.333333     0.4109589   FALSE  TRUE
+## HeatingQC        1.731308     0.3424658   FALSE FALSE
+## CentralAir      14.368421     0.1369863   FALSE FALSE
+## Electrical      14.191489     0.3424658   FALSE FALSE
+## 1stFlrSF         1.562500    51.5753425   FALSE FALSE
+## 2ndFlrSF        82.900000    28.5616438   FALSE FALSE
+## LowQualFinSF   478.000000     1.6438356   FALSE  TRUE
+## GrLivArea        1.571429    58.9726027   FALSE FALSE
+## BsmtFullBath     1.455782     0.2739726   FALSE FALSE
+## BsmtHalfBath    17.225000     0.2054795   FALSE FALSE
+## FullBath         1.181538     0.2739726   FALSE FALSE
+## HalfBath         1.706542     0.2054795   FALSE FALSE
+## BedroomAbvGr     2.245810     0.5479452   FALSE FALSE
+## KitchenAbvGr    21.415385     0.2739726   FALSE  TRUE
+## KitchenQual      1.254266     0.2739726   FALSE FALSE
+## TotRmsAbvGrd     1.221884     0.8219178   FALSE FALSE
+## Functional      40.000000     0.4794521   FALSE  TRUE
+## Fireplaces       1.061538     0.2739726   FALSE FALSE
+## GarageType       2.248062     0.4109589   FALSE FALSE
+## GarageYrBlt      1.101695     6.6438356   FALSE FALSE
+## GarageFinish     1.433649     0.2054795   FALSE FALSE
+## GarageCars       2.233062     0.3424658   FALSE FALSE
+## GarageArea       1.653061    30.2054795   FALSE FALSE
+## GarageQual      27.312500     0.3424658   FALSE  TRUE
+## GarageCond      37.885714     0.3424658   FALSE  TRUE
+## PavedDrive      14.888889     0.2054795   FALSE FALSE
+## WoodDeckSF      20.026316    18.7671233   FALSE FALSE
+## OpenPorchSF     22.620690    13.8356164   FALSE FALSE
+## EnclosedPorch   83.466667     8.2191781   FALSE  TRUE
+## 3SsnPorch      478.666667     1.3698630   FALSE  TRUE
+## ScreenPorch    224.000000     5.2054795   FALSE  TRUE
+## PoolArea      1453.000000     0.5479452   FALSE  TRUE
+## MiscVal        128.000000     1.4383562   FALSE  TRUE
+## MoSold           1.081197     0.8219178   FALSE FALSE
+## YrSold           1.027356     0.3424658   FALSE FALSE
+## SaleType        10.385246     0.6164384   FALSE FALSE
+## SaleCondition    9.584000     0.4109589   FALSE FALSE
+## SalePrice        1.176471    45.4109589   FALSE FALSE</code></pre>
+<pre class="r"><code>dim(nzv)</code></pre>
+<pre><code>## [1] 74  4</code></pre>
+<p>There seem to be predictors with very low variance - we use the default metrics here to assesss whether we classify a predictor as near zero-variance or not</p>
+<pre class="r"><code>nzv&lt;-nearZeroVar(dta) ## don&#39;t save metrics here since we need the index of the near zero variance variables
+dta_v2&lt;-dta[,-nzv]
+dim(dta_v2)</code></pre>
+<pre><code>## [1] 1460   54</code></pre>
+<p><strong>20 variables with near zero variance were removed</strong></p>
+<p>Another quick measure we should look at is multi-collinearity.<br />
+Check for correlations between the numeric variables to avoid multi-collinearity issues</p>
+<pre class="r"><code>dta_v2%&gt;%
+  select_if(.,is.integer)%&gt;%
+  cor(.,use=&quot;pairwise.complete.obs&quot;,method=&quot;spearman&quot;)%&gt;%
+    corrplot(., type = &quot;upper&quot;,method=&quot;circle&quot;,title=&quot;Spearman  Correlation&quot;,mar=c(0,0,1,0),number.cex = .2)</code></pre>
+<p><img src="/post/2019-02-03-implementation-of-the-radnomforestsrc-package-to-generate-confidence-regions-on-variable-importance-measures_files/figure-html/unnamed-chunk-7-1.png" width="672" /></p>
+<p>Some very interesting things come out from the plot above. We see that the variable ‘YearBuilt’ is very highly correlated with ‘GarageYrBuilt’ - which makes sense. It’s likely that the garage for the house was built as the same time as the house was built. Similarly, GarageCars is highly correlated with GarageArea which again makes sense - more the area, more cars can be parked in the garage.</p>
+<p>An encouraging thing that does come out is several of the variables are somewhat moderate to high correlated with the sale price.</p>
+<p>We see that there are some variables that are actually categorical in nature, but are treated as integers/numbers - they should really be converted to categorical variables. For example, MoSold is the month of the year in which the house was sold from 1… through 12. In addition, the character vectors need to be converted to factors as well to be used in the random forest model.</p>
+<pre class="r"><code>dta_v2&lt;-dta_v2%&gt;%
+  mutate_at(.,vars(MSSubClass,MoSold,BsmtFullBath,BsmtHalfBath,FullBath,HalfBath,YrSold),as.factor)%&gt;%
+  map_if(is.character,as.factor)%&gt;%
+  as.tibble()</code></pre>
+<p>How many predictors have correlation &gt;0.80?</p>
+<pre class="r"><code>dta_v2%&gt;%
+  select_if(.,is.integer)%&gt;%
+  cor(.,method=&quot;spearman&quot;,use=&quot;pairwise.complete.obs&quot;)%&gt;%
+  findCorrelation(.,cutoff = 0.80)</code></pre>
+<pre><code>## [1] 21 12 17  4  9</code></pre>
+<p>How many have &gt;0.90</p>
+<pre class="r"><code>dta_v2%&gt;%
+  select_if(.,is.integer)%&gt;%
+  cor(.,method=&quot;spearman&quot;,use=&quot;pairwise.complete.obs&quot;)%&gt;%
+  findCorrelation(.,cutoff = 0.90)</code></pre>
+<pre><code>## integer(0)</code></pre>
+<p><em>No predictors have correlation &gt;0.90</em></p>
+<p>A random forest model for training in <code>caret</code> needs complete data - in cases where the specified method can handle missing data, using the argument ‘na.action=na.pass’ in the train function (look up documentation in <code>caret</code> to which models can work with missing date)</p>
+<p>But for our purposes, we drop all cases with any missing values</p>
+<pre class="r"><code>dta_rf&lt;-dta_v2%&gt;%
+  drop_na()
+dim(dta_rf)</code></pre>
+<pre><code>## [1] 1339   54</code></pre>
+<p>We’re down to 1339 samples from 1460 originally</p>
+<p>Let’s fit a <em>vanilla</em> random forest model. The default option in <code>caret</code> runs the specified model over 25 bootstrap samples across 3 options of the <code>mtry</code> tuning parameter.</p>
+<pre class="r"><code>rf_vanilla&lt;-train(log(SalePrice)~.,method=&quot;ranger&quot;,data=dta_rf)
+rf_vanilla</code></pre>
+<pre><code>## Random Forest 
+## 
+## 1339 samples
+##   53 predictor
+## 
+## No pre-processing
+## Resampling: Bootstrapped (25 reps) 
+## Summary of sample sizes: 1339, 1339, 1339, 1339, 1339, 1339, ... 
+## Resampling results across tuning parameters:
+## 
+##   mtry  splitrule   RMSE       Rsquared   MAE       
+##     2   variance    0.2118300  0.7988101  0.14831386
+##     2   extratrees  0.2288591  0.7577183  0.16414988
+##   104   variance    0.1392608  0.8679709  0.09296462
+##   104   extratrees  0.1476678  0.8545691  0.09793637
+##   207   variance    0.1455813  0.8529939  0.09900453
+##   207   extratrees  0.1482773  0.8514359  0.09834895
+## 
+## Tuning parameter &#39;min.node.size&#39; was held constant at a value of 5
+## RMSE was used to select the optimal model using the smallest value.
+## The final values used for the model were mtry = 104, splitrule =
+##  variance and min.node.size = 5.</code></pre>
+<p>The above was a ‘vanilla’ model, let’s finetune the model by trying out different values of the hyperparameters</p>
+<pre class="r"><code>tuning&lt;-expand.grid(mtry = c(90:110),
+                      splitrule = c(&quot;variance&quot;),
+                      min.node.size = c(3:8))
+fit_control&lt;-trainControl(method = &quot;oob&quot;,number = 5) ## out of bag estimation for computational efficiency 
+rf_upgrade&lt;-train(log(SalePrice)~.,method=&quot;ranger&quot;,data=dta_rf,trControl=fit_control,tuneGrid=tuning)
+plot(rf_upgrade)</code></pre>
+<p><img src="/post/2019-02-03-implementation-of-the-radnomforestsrc-package-to-generate-confidence-regions-on-variable-importance-measures_files/figure-html/unnamed-chunk-13-1.png" width="672" /></p>
+<p><em>The final values used for the model were mtry = 93, splitrule = variance and min.node.size = 3.</em></p>
+<p>We will use the optimal paramters to fit a random forest model and assess variable importance and put confidence intervals on the variables</p>
+<pre class="r"><code>library(randomForestSRC)</code></pre>
+<pre><code>## Warning: package &#39;randomForestSRC&#39; was built under R version 3.5.2</code></pre>
+<pre><code>## 
+##  randomForestSRC 2.8.0 
+##  
+##  Type rfsrc.news() to see new features, changes, and bug fixes. 
+## </code></pre>
+<pre><code>## 
+## Attaching package: &#39;randomForestSRC&#39;</code></pre>
+<pre><code>## The following objects are masked from &#39;package:e1071&#39;:
+## 
+##     impute, tune</code></pre>
+<pre><code>## The following object is masked from &#39;package:purrr&#39;:
+## 
+##     partial</code></pre>
+<pre class="r"><code>dta_v3&lt;-dta_rf%&gt;%
+ mutate(SalePrice=log(SalePrice))
+
+rf_ciMod&lt;-rfsrc(SalePrice ~ .,data=as.data.frame(dta_v3),mtry = 93,nodesize = 3)
+## Print the variable importance 
+#var_imp&lt;-vimp(rf_ciMod)
+#print(vimp(rf_ciMod))</code></pre>
+</div>
+<div id="variable-importance" class="section level3">
+<h3>Variable Importance</h3>
+<p>The bootstrap is a popular method that can be used for estimating the variance of an estimator. So why not use the boot- strap to estimate the standard error for VIMP? One problem is that running a bootstrap on a forest is computationally expensive. Another more serious problem, however, is that a direct application of the bootstrap will not work for VIMP. This is because RF trees already use bootstrap data and applying the bootstrap creates double‐bootstrap data that affects the coherence of being OOB(out of bag).</p>
+<p>A solution to this problem was given by a <em>0.164 bootstrap estimator</em>, which is careful to only use OOB data. However, A problem with the .164 bootstrap estimator is that its OOB data set is smaller than a typical OOB estimator. Truly OOB data from a double bootstrap can be less than half the size of OOB data used in a standard VIMP calculation (16.4% versus 36.8%). Thus, in a forest of 1000 trees, the .164 estimator uses about 164 trees on average to calculate VIMP for a case compared with 368 trees used in a standard calculation. This can reduce efficiency of the .164 estimator. Another problem is computational expense. The .164 estimator requires repeatedly fitting RF to bootstrap data, which becomes expensive as n increases</p>
+<p>The paper I referenced above has a another solution for this called <em>sub sampling</em>. The idea rests on calculating VIMP over small iid subsets of the data. Because sampling is without replacement, this avoid ties in the OOB data that creates problems for the bootstrap. Also, because each calculation is fast, the procedure is computation- ally efficient, especially in big <em>n</em> settings.</p>
+<p>We’ve fit a random forest model above <code>rf_ciMod</code> using the <code>randomForestSRC</code> package functions- now we caclulate the variable importance.</p>
+<p><code>rf_sub</code> contains point estimates as well as the bootstrap estimates</p>
+<pre class="r"><code>var_imps&lt;-as.data.frame(rf_sub$vmp)
+var_imps$Predictors&lt;-rownames(var_imps)
+var_imps%&gt;%
+  ggplot(.,aes(y=reorder(Predictors,SalePrice),x=SalePrice))+geom_point(stat = &quot;identity&quot;)+ labs(y=&quot;Variable Importance&quot;)</code></pre>
+<p><img src="/post/2019-02-03-implementation-of-the-radnomforestsrc-package-to-generate-confidence-regions-on-variable-importance-measures_files/figure-html/unnamed-chunk-17-1.png" width="384" /></p>
+</div>
+<div id="how-to-extract-the-bootstrap-estimates" class="section level3">
+<h3>How to extract the bootstrap estimates?</h3>
+<p>The object <code>rf_sub</code> contains the bootstrap estimates for all predictors in the list <code>vmpS</code></p>
+<pre class="r"><code>boots&lt;-rf_sub$vmpS
+## how to bind all the bootstraps into one df ?
+
+## Create an empty list 
+boots_2&lt;-vector(&quot;list&quot;,100)
+for (i in 1:length(boots_2)){
+  boots_2[[i]]&lt;-t(as.data.frame(boots[i]))
+}
+
+# Bind all the rows in a dataframe 
+boot_df&lt;-do.call(rbind,boots_2)
+rownames(boot_df)&lt;-seq(1,100,by=1)
+boot_df&lt;-as.tibble(boot_df)
+
+boot_df&lt;-boot_df%&gt;%
+  mutate(`1stFlrSF`=X1stFlrSF,`2ndFlrSF`=X2ndFlrSF)%&gt;%
+  select(-c(X1stFlrSF,X2ndFlrSF))</code></pre>
+<p><code>boot_df</code> now contains all the bootstrap estimates in a convenient dataframe</p>
+<pre class="r"><code>head(boot_df)</code></pre>
+<pre><code>## # A tibble: 6 x 53
+##   MSSubClass MSZoning  LotArea LotShape LotConfig Neighborhood Condition1
+##        &lt;dbl&gt;    &lt;dbl&gt;    &lt;dbl&gt;    &lt;dbl&gt;     &lt;dbl&gt;        &lt;dbl&gt;      &lt;dbl&gt;
+## 1  0.000253   8.36e-4  1.37e-3  2.35e-4   2.22e-5    0.000414    -1.78e-5
+## 2  0.000232  -5.44e-5  6.29e-4  1.83e-4   2.04e-4   -0.0000156    0.     
+## 3  0.0000274  3.28e-5 -6.72e-5  4.90e-4  -1.38e-5    0.00109      0.     
+## 4  0.0000875  3.91e-5  6.88e-4  4.35e-5  -1.54e-4    0.000907     2.00e-6
+## 5  0.000529   6.84e-5  1.50e-2  3.29e-3   5.47e-4    0.000963    -4.16e-5
+## 6  0.000846   1.97e-4  2.42e-3  4.81e-5  -3.31e-5    0.000269    -7.08e-6
+## # ... with 46 more variables: BldgType &lt;dbl&gt;, HouseStyle &lt;dbl&gt;,
+## #   OverallQual &lt;dbl&gt;, OverallCond &lt;dbl&gt;, YearBuilt &lt;dbl&gt;,
+## #   YearRemodAdd &lt;dbl&gt;, RoofStyle &lt;dbl&gt;, Exterior1st &lt;dbl&gt;,
+## #   Exterior2nd &lt;dbl&gt;, MasVnrType &lt;dbl&gt;, MasVnrArea &lt;dbl&gt;,
+## #   ExterQual &lt;dbl&gt;, ExterCond &lt;dbl&gt;, Foundation &lt;dbl&gt;, BsmtQual &lt;dbl&gt;,
+## #   BsmtExposure &lt;dbl&gt;, BsmtFinType1 &lt;dbl&gt;, BsmtFinSF1 &lt;dbl&gt;,
+## #   BsmtUnfSF &lt;dbl&gt;, TotalBsmtSF &lt;dbl&gt;, HeatingQC &lt;dbl&gt;, CentralAir &lt;dbl&gt;,
+## #   Electrical &lt;dbl&gt;, `1stFlrSF` &lt;dbl&gt;, `2ndFlrSF` &lt;dbl&gt;, GrLivArea &lt;dbl&gt;,
+## #   BsmtFullBath &lt;dbl&gt;, BsmtHalfBath &lt;dbl&gt;, FullBath &lt;dbl&gt;,
+## #   HalfBath &lt;dbl&gt;, BedroomAbvGr &lt;dbl&gt;, KitchenQual &lt;dbl&gt;,
+## #   TotRmsAbvGrd &lt;dbl&gt;, Fireplaces &lt;dbl&gt;, GarageType &lt;dbl&gt;,
+## #   GarageYrBlt &lt;dbl&gt;, GarageFinish &lt;dbl&gt;, GarageCars &lt;dbl&gt;,
+## #   GarageArea &lt;dbl&gt;, PavedDrive &lt;dbl&gt;, WoodDeckSF &lt;dbl&gt;,
+## #   OpenPorchSF &lt;dbl&gt;, MoSold &lt;dbl&gt;, YrSold &lt;dbl&gt;, SaleType &lt;dbl&gt;,
+## #   SaleCondition &lt;dbl&gt;</code></pre>
+<div id="calculate-lower-and-upper-quantiles" class="section level5">
+<h5>Calculate lower and upper quantiles</h5>
+<pre class="r"><code>cis&lt;-boot_df%&gt;%
+  gather(var,value,MSSubClass:SaleCondition)%&gt;%
+  group_by(var)%&gt;%
+  summarise(lower_ci=quantile(value,0.025,na.rm = TRUE),
+            upper_ci=quantile(value,0.975,na.rm=TRUE))
+
+
+
+ci_data&lt;-var_imps%&gt;%
+  mutate(var=Predictors,importance=SalePrice)%&gt;%
+  select(-c(Predictors,SalePrice))%&gt;%
+  inner_join(.,cis)</code></pre>
+<pre><code>## Joining, by = &quot;var&quot;</code></pre>
+</div>
+<div id="plot-confidence-regions" class="section level5">
+<h5>Plot confidence regions</h5>
+<pre class="r"><code>ci_data%&gt;%
+  ggplot(.,aes(x=reorder(var,importance),y=importance))+geom_point(stat = &quot;identity&quot;)+ labs(y=&quot;Variable Importance&quot;,x=&quot;Predictors&quot;)+geom_errorbar(aes(ymin=lower_ci, ymax=upper_ci), colour=&quot;black&quot;, width=.1)+coord_flip()</code></pre>
+<p><img src="/post/2019-02-03-implementation-of-the-radnomforestsrc-package-to-generate-confidence-regions-on-variable-importance-measures_files/figure-html/unnamed-chunk-21-1.png" width="672" /></p>
+<p>And here we have it - 95% confidence intervals for the importance measures for all the predictors.</p>
+<p>We note that ‘OverallQual’, ‘GrLivArea’ and ‘Yearbuilt’ do not contain zero in their confidence interval. Even though p-values and the frequentist interpretation of confidence intervals is often mis-used in both academic and business settings, but if it’s done in an appropriate manner and setting, it provides the end user with a better interpretation of the model as compared to one without confidence intervals.</p>
+<div class="figure">
+<img src="/img/thats_it.jpg" alt="And that’s it, folks!" />
+<p class="caption">And that’s it, folks!</p>
+</div>
+</div>
+</div>
