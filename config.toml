@@ -13,7 +13,7 @@ title = "Dilsher Singh Dhillon"
 
 # Your copyright notice - appears in site footer.
 # To display a copyright symbol, type `&copy;`.
-copyright = "&copy; 2018"
+copyright = "&copy; Dilsher Singh Dhillon"
 
 theme = "hugo-academic"
 enableEmoji = true
@@ -23,7 +23,7 @@ preserveTaxonomyNames = true
 paginate = 10
 
 # Enable comments by entering your Disqus shortname
-disqusShortname = ""
+disqusShortname = "dilshersinghdhillon"
 
 # Enable analytics by entering your Google Analytics tracking ID
 googleAnalytics = ""
@@ -107,13 +107,13 @@ enableGitInfo = true
 
   # Color theme.
   #   Choose from `default`, `ocean`, `forest`, `dark`, `apogee`, `1950s`, `coffee`, `cupcake`.
-  color_theme = "forest"
+  color_theme = "default"
   # Enable users to switch between day and night mode?
   day_night = true
 
   # Font style.
   #   Choose from `default`, `classic`, or `playfair`.
-  font = "default"
+  font = "classic"
 
   # Description for social sharing and search engines. If undefined, author role is used in place.
   description = ""
@@ -145,7 +145,7 @@ enableGitInfo = true
 
   # Enable global LaTeX math rendering?
   #   If false, you can enable it locally on a per page basis.
-  math = false
+  math = true
 
   # Highlight.js options
   #   highlight

@@ -60,7 +60,23 @@ date_format = "January 2006"
   location = "Houston, TX"
   date_start = "2015-08-01"
   date_end = "2018-01-01"
-  description = """  """
+  description = """ *Assay Development Platform*  
+  
+* Promoted to a supervisory capacity to oversee assay development of novel biomarkers and testing of in-house and commercial assays in clinical samples for validation  
+
+* Manage the Specimen Manger database for recording subject characteristics, biospecimen banking and inventory and multi- center study inventory for the Lung Cancer Early Detection (LCED) trial  
+
+*Statistical Analysis*  
+
+* Assist scientists and postdocs with statistical analysis of proteomic and genomic data
+* Apply statistical methods such as hierarchical clustering, principal component analysis (PCA) and regression on multivariate data to identify features (genes/proteins) associated with a particular phenotype o Prepare publication quality figures and tables for manuscripts  
+
+* Integrated genomic data for normal and cancer tissues/cell lines from CCLE, TCGA and BioGPS with proteomic data generated for 30 breast cancer cell lines on the Mass Spectrometry  
+
+* Actively engage in building logistic regression models for biomarker panel development on data generated from proteins, autoantibodies and microRNA  
+
+
+"""
 
 [[experience]]
   title = "Research Assistant II "
@@ -69,7 +85,11 @@ date_format = "January 2006"
   location = "Houston,TX"
   date_start = "2013-01-01"
   date_end = "2015-08-01"
-  description = """  """
+  description = """*Biomarker panel development for early detection of lung cancer*  
+  
+* Translated two ELISA assays for proteins differentially expressed in lung cancer into a bead-based assay using the Luminex MagPix platform and achieved higher sensitivity and better inter-assay precision through development and optimization  
+
+* Executed an expanded panel of 34 protein biomarkers for lung cancer assembled into in-house as well as MilliPlex designed panels on various pre-diagnostic and diagnostic lung cancer subjects """
 
 
 +++

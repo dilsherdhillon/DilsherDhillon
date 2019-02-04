@@ -10,10 +10,11 @@ weight = 1
 # List your academic interests.
 [interests]
   interests = [
-    "Biotatistics",
-    "Variable selection in prediction models ",
-    "Causal inference", 
-    "Longitudinal data analysis"
+    "Clinical Statistics",
+    "Machine Learning",
+    "Variable selection in clinical prediction models ",
+    "Longitudinal data analysis",
+    "Unsupervised learning"
   ]
 
 # List your qualifications (such as academic degrees).
@@ -36,9 +37,9 @@ weight = 1
 
 ### Biography
 
-I work as a Statistician with Baylor College of Medicine. I work mostly with electronic medical record data collected in clinics across sub-saharan Africa and helping clinicians answer specific questions from these large longitudinal datasets. I also work with researchers in Baylor to help them get better insights into their experimental lab data.   
+I work as a statistician with Baylor College of Medicine. I work mostly with electronic medical record data collected in clinics across sub-saharan Africa and helping clinicians answer specific questions from these large longitudinal datasets. I also work with researchers in Baylor to help them get better insights into their experimental lab data.   
 
-Prior to being a statistician, I worked for on early detection of cancer using proteomic assays helping develop sensitive blood-based diagnostic tools to detect cancer.  
+Prior to being a full-time statistician, I worked on analyzing mass spectrometry data and developing sensitive blood-based diagnostics assays for early detection of cancer including  [lung](https://www.ncbi.nlm.nih.gov/pubmed/30003238) and [pancreatic](https://www.ncbi.nlm.nih.gov/pubmed/28376157).   
 
 
 ### Applied Skills  
