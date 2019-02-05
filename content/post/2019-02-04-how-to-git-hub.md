@@ -1,13 +1,11 @@
 ---
 title: 'How to git (hub)  '
-author: "Dilsher Dhillon"
+author: Dilsher Dhillon
 date: '2019-02-04'
 image:
   caption: ''
   focal_point: ''
 slug: how-to-git-hub
-tags: []
-categories: []
 ---
 
 I think everyone at somepoint, regardless of what industry they're in, have folders which have files saved as _v2,_v3... v_final... That can only mean one thing down the line - chaos.   
