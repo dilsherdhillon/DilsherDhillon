@@ -1,16 +1,3 @@
----
-title: Implementation of the randomForestSRC package to generate confidence regions
-  on variable importance measures
-author: 'Dilsher Dhillon'
-date: '2019-02-03'
-slug: implementation-of-the-randomforestsrc-package-to-generate-confidence-regions-on-variable-importance-measures
-categories: [R]
-tags: []
-image:
-  caption: ''
-  focal_point: ''
----
-
 
 
 <p>At a recent data science meetup in Houston, I spoke to one of the panel speakers who was a data scientist for an oil and gas consulting company. They mostly used tree based methods like <em>random forest</em>, <em>bagging</em> and <em>boosting</em> and one of the challenges he said they frequently encountered while presenting their results, were putting confidence intervals on the variable importance measures.</p>
@@ -33,7 +20,7 @@ library(corrplot)</code></pre>
 <pre class="r"><code>train &lt;- read_csv(&quot;/Users/dilsherdhillon/Documents/Website/DilsherDhillon/static/files/train.csv&quot;)</code></pre>
 <p>The package <a href="https://github.com/njtierney/naniar">naniar</a> provides a nice feature which can be utilized to visualize completeness of data in one simple line of code</p>
 <pre class="r"><code>gg_miss_var(train,show_pct = TRUE)</code></pre>
-<p><img src="/post/2019-02-03-implementation-of-the-radnomforestsrc-package-to-generate-confidence-regions-on-variable-importance-measures_files/figure-html/unnamed-chunk-3-1.png" width="768" /></p>
+<p><img src="2019-02-03-implementation-of-the-radnomforestsrc-package-to-generate-confidence-regions-on-variable-importance-measures_files/figure-html/unnamed-chunk-3-1.png" width="768" /></p>
 <pre class="r"><code>## Other functions that maybe useful for your specific problem
 #vis_miss(train,show_perc_col = TRUE,warn_large_data = TRUE)
 #vis_miss(train,show_perc_col = TRUE,warn_large_data = TRUE)
@@ -139,7 +126,7 @@ Check for correlations between the numeric variables to avoid multi-collinearity
   select_if(.,is.integer)%&gt;%
   cor(.,use=&quot;pairwise.complete.obs&quot;,method=&quot;spearman&quot;)%&gt;%
     corrplot(., type = &quot;upper&quot;,method=&quot;circle&quot;,title=&quot;Spearman  Correlation&quot;,mar=c(0,0,1,0),number.cex = .2)</code></pre>
-<p><img src="/post/2019-02-03-implementation-of-the-radnomforestsrc-package-to-generate-confidence-regions-on-variable-importance-measures_files/figure-html/unnamed-chunk-7-1.png" width="672" /></p>
+<p><img src="2019-02-03-implementation-of-the-radnomforestsrc-package-to-generate-confidence-regions-on-variable-importance-measures_files/figure-html/unnamed-chunk-7-1.png" width="672" /></p>
 <p>Some very interesting things come out from the plot above. We see that the variable ‘YearBuilt’ is very highly correlated with ‘GarageYrBuilt’ - which makes sense. It’s likely that the garage for the house was built as the same time as the house was built. Similarly, GarageCars is highly correlated with GarageArea which again makes sense - more the area, more cars can be parked in the garage.</p>
 <p>An encouraging thing that does come out is several of the variables are somewhat moderate to high correlated with the sale price.</p>
 <p>We see that there are some variables that are actually categorical in nature, but are treated as integers/numbers - they should really be converted to categorical variables. For example, MoSold is the month of the year in which the house was sold from 1… through 12. In addition, the character vectors need to be converted to factors as well to be used in the random forest model.</p>
@@ -147,6 +134,8 @@ Check for correlations between the numeric variables to avoid multi-collinearity
   mutate_at(.,vars(MSSubClass,MoSold,BsmtFullBath,BsmtHalfBath,FullBath,HalfBath,YrSold),as.factor)%&gt;%
   map_if(is.character,as.factor)%&gt;%
   as.tibble()</code></pre>
+<pre><code>## Warning: `as.tibble()` is deprecated, use `as_tibble()` (but mind the new semantics).
+## This warning is displayed once per session.</code></pre>
 <p>How many predictors have correlation &gt;0.80?</p>
 <pre class="r"><code>dta_v2%&gt;%
   select_if(.,is.integer)%&gt;%
@@ -181,12 +170,12 @@ rf_vanilla</code></pre>
 ## Resampling results across tuning parameters:
 ## 
 ##   mtry  splitrule   RMSE       Rsquared   MAE       
-##     2   variance    0.2118300  0.7988101  0.14831386
-##     2   extratrees  0.2288591  0.7577183  0.16414988
-##   104   variance    0.1392608  0.8679709  0.09296462
-##   104   extratrees  0.1476678  0.8545691  0.09793637
-##   207   variance    0.1455813  0.8529939  0.09900453
-##   207   extratrees  0.1482773  0.8514359  0.09834895
+##     2   variance    0.2107885  0.7992672  0.14917042
+##     2   extratrees  0.2282024  0.7586043  0.16510928
+##   104   variance    0.1366434  0.8714597  0.09229815
+##   104   extratrees  0.1432452  0.8619109  0.09671694
+##   207   variance    0.1435587  0.8556214  0.09824293
+##   207   extratrees  0.1430987  0.8600771  0.09689750
 ## 
 ## Tuning parameter &#39;min.node.size&#39; was held constant at a value of 5
 ## RMSE was used to select the optimal model using the smallest value.
@@ -199,11 +188,10 @@ rf_vanilla</code></pre>
 fit_control&lt;-trainControl(method = &quot;oob&quot;,number = 5) ## out of bag estimation for computational efficiency 
 rf_upgrade&lt;-train(log(SalePrice)~.,method=&quot;ranger&quot;,data=dta_rf,trControl=fit_control,tuneGrid=tuning)
 plot(rf_upgrade)</code></pre>
-<p><img src="/post/2019-02-03-implementation-of-the-radnomforestsrc-package-to-generate-confidence-regions-on-variable-importance-measures_files/figure-html/unnamed-chunk-13-1.png" width="672" /></p>
+<p><img src="2019-02-03-implementation-of-the-radnomforestsrc-package-to-generate-confidence-regions-on-variable-importance-measures_files/figure-html/unnamed-chunk-13-1.png" width="672" /></p>
 <p><em>The final values used for the model were mtry = 93, splitrule = variance and min.node.size = 3.</em></p>
 <p>We will use the optimal paramters to fit a random forest model and assess variable importance and put confidence intervals on the variables</p>
 <pre class="r"><code>library(randomForestSRC)</code></pre>
-<pre><code>## Warning: package &#39;randomForestSRC&#39; was built under R version 3.5.2</code></pre>
 <pre><code>## 
 ##  randomForestSRC 2.8.0 
 ##  
@@ -236,7 +224,7 @@ rf_ciMod&lt;-rfsrc(SalePrice ~ .,data=as.data.frame(dta_v3),mtry = 93,nodesize =
 var_imps$Predictors&lt;-rownames(var_imps)
 var_imps%&gt;%
   ggplot(.,aes(y=reorder(Predictors,SalePrice),x=SalePrice))+geom_point(stat = &quot;identity&quot;)+ labs(y=&quot;Variable Importance&quot;)</code></pre>
-<p><img src="/post/2019-02-03-implementation-of-the-radnomforestsrc-package-to-generate-confidence-regions-on-variable-importance-measures_files/figure-html/unnamed-chunk-17-1.png" width="384" /></p>
+<p><img src="2019-02-03-implementation-of-the-radnomforestsrc-package-to-generate-confidence-regions-on-variable-importance-measures_files/figure-html/unnamed-chunk-17-1.png" width="384" /></p>
 </div>
 <div id="how-to-extract-the-bootstrap-estimates" class="section level3">
 <h3>How to extract the bootstrap estimates?</h3>
@@ -261,15 +249,15 @@ boot_df&lt;-boot_df%&gt;%
 <p><code>boot_df</code> now contains all the bootstrap estimates in a convenient dataframe</p>
 <pre class="r"><code>head(boot_df)</code></pre>
 <pre><code>## # A tibble: 6 x 53
-##   MSSubClass MSZoning  LotArea LotShape LotConfig Neighborhood Condition1
-##        &lt;dbl&gt;    &lt;dbl&gt;    &lt;dbl&gt;    &lt;dbl&gt;     &lt;dbl&gt;        &lt;dbl&gt;      &lt;dbl&gt;
-## 1  0.000253   8.36e-4  1.37e-3  2.35e-4   2.22e-5    0.000414    -1.78e-5
-## 2  0.000232  -5.44e-5  6.29e-4  1.83e-4   2.04e-4   -0.0000156    0.     
-## 3  0.0000274  3.28e-5 -6.72e-5  4.90e-4  -1.38e-5    0.00109      0.     
-## 4  0.0000875  3.91e-5  6.88e-4  4.35e-5  -1.54e-4    0.000907     2.00e-6
-## 5  0.000529   6.84e-5  1.50e-2  3.29e-3   5.47e-4    0.000963    -4.16e-5
-## 6  0.000846   1.97e-4  2.42e-3  4.81e-5  -3.31e-5    0.000269    -7.08e-6
-## # ... with 46 more variables: BldgType &lt;dbl&gt;, HouseStyle &lt;dbl&gt;,
+##   MSSubClass MSZoning LotArea LotShape LotConfig Neighborhood Condition1
+##        &lt;dbl&gt;    &lt;dbl&gt;   &lt;dbl&gt;    &lt;dbl&gt;     &lt;dbl&gt;        &lt;dbl&gt;      &lt;dbl&gt;
+## 1   0.000286  6.65e-5 0.00133  7.99e-4  -2.21e-5     0.000407 -0.0000697
+## 2   0.00226  -1.29e-5 0.00294  2.97e-4  -1.03e-4     0.00192  -0.0000112
+## 3   0.000132  4.65e-4 0.00672  1.29e-3   1.55e-4     0.000660  0        
+## 4   0.000643  2.19e-6 0.00185 -7.49e-5  -1.15e-5     0.000812  0.000372 
+## 5   0.00187   2.33e-5 0.00221 -1.30e-4   2.20e-4     0.00150   0.000137 
+## 6   0.00141   8.83e-4 0.00145 -5.57e-5  -6.07e-5     0.000785 -0.0000403
+## # … with 46 more variables: BldgType &lt;dbl&gt;, HouseStyle &lt;dbl&gt;,
 ## #   OverallQual &lt;dbl&gt;, OverallCond &lt;dbl&gt;, YearBuilt &lt;dbl&gt;,
 ## #   YearRemodAdd &lt;dbl&gt;, RoofStyle &lt;dbl&gt;, Exterior1st &lt;dbl&gt;,
 ## #   Exterior2nd &lt;dbl&gt;, MasVnrType &lt;dbl&gt;, MasVnrArea &lt;dbl&gt;,
@@ -304,7 +292,7 @@ ci_data&lt;-var_imps%&gt;%
 <h5>Plot confidence regions</h5>
 <pre class="r"><code>ci_data%&gt;%
   ggplot(.,aes(x=reorder(var,importance),y=importance))+geom_point(stat = &quot;identity&quot;)+ labs(y=&quot;Variable Importance&quot;,x=&quot;Predictors&quot;)+geom_errorbar(aes(ymin=lower_ci, ymax=upper_ci), colour=&quot;black&quot;, width=.1)+coord_flip()</code></pre>
-<p><img src="/post/2019-02-03-implementation-of-the-radnomforestsrc-package-to-generate-confidence-regions-on-variable-importance-measures_files/figure-html/unnamed-chunk-21-1.png" width="672" /></p>
+<p><img src="2019-02-03-implementation-of-the-radnomforestsrc-package-to-generate-confidence-regions-on-variable-importance-measures_files/figure-html/unnamed-chunk-21-1.png" width="672" /></p>
 <p>And here we have it - 95% confidence intervals for the importance measures for all the predictors.</p>
 <p>We note that ‘OverallQual’, ‘GrLivArea’ and ‘Yearbuilt’ do not contain zero in their confidence interval. Even though p-values and the frequentist interpretation of confidence intervals is often mis-used in both academic and business settings, but if it’s done in an appropriate manner and setting, it provides the end user with a better interpretation of the model as compared to one without confidence intervals.</p>
 <div class="figure">

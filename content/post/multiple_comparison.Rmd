@@ -1,0 +1,377 @@
+---
+title: "Multiple Comparisons and Bayesian Inference"
+date: "`r Sys.Date()`"
+output:
+  html_document: 
+    highlight: kate
+    theme: readable
+    toc: yes
+    toc_depth: 4
+    toc_float: yes
+---
+
+# Motivation  
+They say the best way to learn something, is to teach it!  And that's exactly what I intend to do.  Inspired by Solomon Kurtz blog posts on power calcualtions in bayesian inference, and Dr. Gelman's blogs, here's an attempt to open the guts of a problem I've struggled with.  
+I don't have a whole lot of experience in simualtions, so looking forward hearing how I can improve my assumptions to reach a valid conclusion.  
+
+# Background  
+As an applied statistician, trained primarily under a frequentist paradigm, I've been taught and have used frequentist inference for all the work I've done - up until sometime last year.  Except for that one bayesian class in school, which focused on laying the mathematical statistics and probability distribution ground work, I really was never exposed to tools to use bayesian inference in an applied setting.  Although I thank the 2017 me for taking that elective, since it's helped me better gain an intuition for bayesian inference.  
+
+# Applied Bayesian Inference   
+I work in an industry where there is a heavy emphasis on design of experiments(DOE). And with DOE, come a whole host of other things to take into consideration.  A very common error is to misinterpret the design and analyze it differently than it should have been (the [split plot](https://newonlinecourses.science.psu.edu/stat503/node/71/) comes to mind, where care needs to be taken to account for the split plot error).   
+
+Another is the *multiple testing* problem, more the number of post-hoc comparisons, the more likely we are to reject the null and make a type I error.  That's when you have the bonferroni's, the tukey's, the dunnett's to control for the family wise error rate.   
+
+This got me wondering, does a bayesian worry about multiple testing? Even though making a type I error is associated with rejecting the null, when in fact the null is true, which is a freqeuntist paradigm - a bayesian should still be concerned about an uncertainity interval excluding 0, when in fact, 0 is a plausible value in the posterior distribution.  
+
+And so a quick google-fu later, of course, Dr. Gelman has written a lot about this topic.  [This](https://statmodeling.stat.columbia.edu/2016/08/22/bayesian-inference-completely-solves-the-multiple-comparisons-problem/) blog post gives a nice intuitive explanation.  
+
+The gist is, and hopefully I interpreted it correctly, if you're putting a prior on your estimates, Dr. Gelman shows you're less likely to conclude there is an effect when infact there's none. This is because of the conservative nature of bayesian estimation.  
+
+But what if, for example, like a recent study I analyzed, there's a two-factorial design, with 6 levels to each factor, AND there's an interaction going on so we'd like to test for differences in the 6 levels of one factor, at EVERY level of the factor. That's 90 pairwise comparisons.  It's quite realistic to assume that you can't put an informative prior on every single interaction estimate.  What does one do in this situation?   Well, the answer, if you haven't already guessed it, are multilevel models.  [Here's](http://www.stat.columbia.edu/~gelman/research/published/AOS259.pdf) the paper Dr. Gelman linked me to when I asked him about it.  
+
+This post is too short to explain in detail what multilevel models are, but here are a few of the many resources available that would help get a sense of them.  
+[partial pooling using heirarchical models](https://cran.r-project.org/web/packages/rstanarm/vignettes/pooling.html)   
+[Plotting partial pooling models using lme4](https://www.tjmahr.com/plotting-partial-pooling-in-mixed-effects-models/)  
+
+
+
+
+
+
+Everyone in my team swears by frequentist approaches, and I'm not saying they're wrong, in fact, the way they approach their analysis is very similar to bayesian inference (using subject matter expertise to pre-specify a model, avoiding the garden of forking paths.. and such).  But hopefully I can come up with an intutive demonstration to show why we should be running our ANOVAs as multilevel models, and not worry about what's a fixed effect vs a random effect. 
+
+
+# Simulation Set up  
+As noted before, I haven't done a lot of simulations, except for power analysis etc, so this is a very crude attempt at setting up a simple simulation.   We'll compare three simulations.  
+1.  A one - way ANOVA with 5 levels of a factor, conducting 10 pairwise comparisons, without controlling the Type 1 error  
+2.  A one - way ANOVA with 5 levels of a factor, conducting 10 pairwise comparisons, controlling for Type 1 error using the Tukey correction  
+3.  A one - way ANOVA with 5 levels of a factor, but estimated using a multilevel model, pooling estimates from other groups, under a bayesian framework.  
+
+We'll be using the [emmeans](https://cran.r-project.org/web/packages/emmeans/vignettes/interactions.html) for frequentist comparisons, and the [brms](https://github.com/paul-buerkner/brms) for the bayesian multilevel models.   
+
+## Frequentist pairwise comparisons  
+
+Let's set up a simple linear model with 5 groups, and each group has 5 replications each.   
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+
+```{r}
+library(tidyverse)
+#library(brms)
+library(emmeans)
+```
+
+```{r}
+## these are the names of all the dogs I've had :) 
+treatmentA <-rep(c("snoopy","ginger","sugar","spicy","lisa"), times = 3)
+
+d <- data.frame(treatmentA = treatmentA, 
+            response = rnorm(15, 10, 20))
+
+## Initialize a model so we can simply update simulated data
+fit <- lm(response ~ treatmentA, data = d)
+
+## This is where all the magic takes place  
+sim_aov <- function(seed) {
+  set.seed(seed)
+  ## simulate new data  
+  d <- data.frame(treatmentA = treatmentA, 
+            response = rnorm(15, 10, 20))
+  ## Update model with new data  
+  fit <- update(fit, data = d)
+  
+  ## Calculate pairwise comparisons naive p-values using the emmeans package  
+  n_naive <-
+    emmeans::emmeans(fit, pairwise ~ treatmentA, adjust = "none") %>%
+    purrr::pluck(2) %>%
+    dplyr::tbl_df() %>%
+    dplyr::filter(p.value < 0.05) %>%
+    nrow(.)
+  
+  ## Calculate pairwise comparisons tukey adjusted p-values using the emmeans package  
+  n_tukey <-
+    emmeans::emmeans(fit, pairwise ~ treatmentA, adjust = "tukey") %>%
+    purrr::pluck(2) %>%
+    dplyr::tbl_df() %>%
+    dplyr::filter(p.value < 0.05) %>%
+    nrow(.)
+  
+  output <- list(n_naive, n_tukey)
+  
+  
+}
+```
+
+Now we're ready to simulate the above models!  
+
+```{r}
+seeds <- rep(1:1000)
+sim_results <- purrr::map(seeds, function(x)
+  sim_aov(seed = x))
+```
+
+We'll separate out the naive p-vaues and the tukey adjusted p values. I've used the 0.05 threshold to call out if something is significant or not.  
+
+```{r}
+naive_p <- sapply(sim_results,`[[`,1) 
+tukey_p <- sapply(sim_results,`[[`,2) 
+```
+
+
+There's two ways to look at it - 
+1. Of the 1000 models run, how many TOTAL pairwise comparisons resulted in p<0.05. This corresponds to 10 tests in each model, so a total of 10,000 tests.  
+2. On the other hand, of the 1000 models, how many had AT LEAST one signficant result? That corresponds to a 1000 tests.
+
+### Naive 
+Total number of significant pairwise comparisons?  
+
+```{r}
+s <- sum(naive_p)
+s
+```
+
+
+How many times did we see atleast one pairwise comparison significant?  
+
+```{r}
+t <- (1000 - sum(naive_p == 0))
+t
+```
+
+That means, `r 100*(t/1000)` % of the time, we see atleast one pairwise comparison significant, when in fact, there is no difference.
+
+That's not surprising, we expect the error rates to be that high.  And thats' why we have the corrections we normally apply.  
+
+### Tukey adjusted     
+Total number of significnat pairwise comparisons?  
+
+```{r}
+sum(tukey_p)
+```
+
+Dropped down to an error rate of `r 77/10000` 
+
+
+How many times did we see atleast one pairwise comparison significant?  
+
+```{r}
+(1000 - sum(tukey_p == 0))
+```
+
+Dropped down to an error rate of `r 58/1000` 
+
+Seems like Tukey correction is actually doing it's job, which is good news.  
+
+Let's move on to the bayesian comparison now! 
+
+## Bayesian Comparisons  
+Let's first run a one-model example and we'll write a function for it to then iterate over simualted data sets.  Let's introduce [Paul Buerkner's](https://github.com/paul-buerkner/brms) `brms` library.  
+
+Instead of estimating the LS means, we'll estimating separate intercepts for each level in the factor.  The syntax is very similar to `lme4`.  For more information on brms and it's documentation, [check out the github rep](https://github.com/paul-buerkner/brms)  
+
+
+
+```{r eval=FALSE}
+library(brms)
+d_bayes <- data.frame(treatmentA = as_factor(rep(c(1,2,3,4,5), each = 3)), response = rnorm(15,10,20))
+## initialize the model  
+mod_brms <- brms::brm(response ~  (1|treatmentA), data = d_bayes, chains = 4, cores = 4, 
+                      prior = c(
+    prior(normal(10, 5), "Intercept"),
+    prior(student_t(3, 0, 15), "sd"),
+    prior(student_t(3, 0, 15), "sigma")), family = gaussian)
+## We'll be using weakly informative priors 
+saveRDS(mod_brms,"/Users/dilsherdhillon/Documents/Website/DilsherDhillon/static/files/mod_brms.rds")
+```
+
+NB - 
+The same model can be run using the `rethinking` library by Dr. McElreath.  Since I'm currently going through his lectures and homeworks, I'd be remiss if I didn't show you how to do it using `rethinking` 
+
+```{r eval=FALSE}
+data_list <- list(
+  treatmentA = as.integer(d_bayes$treatmentA),
+  response = scale(d_bayes$response)
+)
+
+f <- alist(
+  response ~ dnorm(mu, sigma),
+  mu <- a_trt[treatmentA] ,
+  ## adaptive priors  
+  a_trt[treatmentA] ~ dnorm(a_bar, sigma_A),
+  ## hyper priors  
+  a_bar ~ dnorm(0,1.5),
+  sigma ~ dexp(1),
+  sigma_A ~ dexp(1)
+ )
+mod <- rethinking::ulam(
+  f, data = data_list, chains = 4, iter = 8000, control=list(adapt_delta=0.99), cores = 4
+)
+## You'll notice I used different priors, but it really doesn't matter in the context of this problem.   
+## THIS CODE NOT RUN  
+```
+
+
+
+
+Pairwise comparisons aren't as straightforward as a linear model we ran above.  We'll first need to extract out the estimates from the posterior, and compute these pairwise differences and their 95% intervals by hand.  It's more fun this way!  
+
+```{r}
+mod_brms <- readRDS("/Users/dilsherdhillon/Documents/Website/DilsherDhillon/static/files/mod_brms.rds")
+## extract the intercepts  
+  post <- brms::posterior_samples(mod_brms) %>% 
+    select(contains("r_treatmentA"))
+str(post) 
+```
+
+We'll make use of the helpful `outer` function and some more wrangling to get it in the right format.  
+
+```{r}
+pairs <- outer(colnames(post), colnames(post), paste, sep = "-")
+index <-  which(lower.tri(pairs, diag = TRUE))
+comparisons <- outer(1:ncol(post), 1:ncol(post),
+                     function(x, y)
+                       post[, x] - post[, y])
+colnames(comparisons) <- pairs
+comparisons <- comparisons[-index]
+
+str(comparisons)  
+```
+
+Now we want all the comparisons, that excluded zero, in either direction (Dr. Gelman calls this the Type S error, but that's outside the scope of this post)  
+
+```{r}
+  ## this gets us the number of comparisons that excluded zero  
+  comparisons %>%
+    gather() %>%
+    group_by(key) %>%
+    mutate(mean = mean(value), lower_ci = quantile(value, 0.025), upper_ci = quantile(value, 0.975)) %>%
+    distinct(mean, .keep_all = TRUE) %>%
+    select(-c(value)) %>%
+    ## create a new variable that tells us whether the interval exlcudes zero or not  
+    mutate(less = ifelse(lower_ci <0 & upper_ci <0,1,0), more = ifelse(lower_ci >0 & upper_ci >0,1,0)) %>%
+    mutate(tot = less + more) %>%
+    ungroup() %>%
+    summarise(total_significant_comparisons = sum(tot)) %>%
+    dplyr::pull()
+```
+
+
+Now that we've opened the guts of how to do it, let's package all of the above into a function that we can then iterate over multiple simualted datasets.  
+
+
+```{r}
+bayes_aov_sim <- function(seed) {
+  set.seed(seed)
+  d_bayes <-
+    tibble(treatmentA = rep(c(1, 2, 3, 4, 5), each = 3),
+           response = rnorm(15, 10, 20))
+  
+  ## before running the function, we'll initialize a base model and update it - it's faster because it avoids recompiling the model in stan.
+  
+  mod_brms <- update(mod_brms, newdata = d_bayes)
+  
+  ## extract estimates
+  post <- brms::posterior_samples(mod_brms) %>%
+    select(contains("r_treatmentA"))
+  
+  
+  pairs <- outer(colnames(post), colnames(post), paste, sep = "-")
+  index <-  which(lower.tri(pairs, diag = TRUE))
+  comparisons <- outer(1:ncol(post), 1:ncol(post),
+                       function(x, y)
+                         post[, x] - post[, y])
+  colnames(comparisons) <- pairs
+  comparisons <- comparisons[-index]
+  
+  ## this gets us the number of comparisons that excluded zero
+  comparisons %>%
+    gather() %>%
+    group_by(key) %>%
+    mutate(
+      mean = mean(value),
+      lower_ci = quantile(value, 0.025),
+      upper_ci = quantile(value, 0.975)
+    ) %>%
+    distinct(mean, .keep_all = TRUE) %>%
+    select(-c(value)) %>%
+    mutate(
+      less = ifelse(lower_ci < 0 &
+                      upper_ci < 0, 1, 0),
+      more = ifelse(lower_ci > 0 & upper_ci > 0, 1, 0)
+    ) %>%
+    mutate(tot = less + more) %>%
+    ungroup() %>%
+    summarise(total_significant_comparisons = sum(tot)) %>%
+    pull()
+} 
+```
+
+
+
+```{r echo=TRUE, eval = FALSE}
+## we use the model mod_brms we initialized before  
+
+seeds <- sample(1:10000,1000, replace = FALSE)
+t1 <- Sys.time()
+out <- purrr::map(seeds, ~bayes_aov_sim(seed = .x))
+t2 <- Sys.time()
+t2-t1
+saveRDS(out, "/Users/dilsherdhillon/Documents/Website/DilsherDhillon/static/files/out.rds")
+```
+
+This took about ~ 18 minutes to run on my computer.  
+```{r}
+bayes_sim_results <- readRDS("/Users/dilsherdhillon/Documents/Website/DilsherDhillon/static/files/out.rds")
+```
+
+**Results**   
+
+How many total pairwise comparisons excluded 0 in their 95% uncertainity intervals?  
+
+```{r}
+bayes_sim_results %>% purrr::simplify() -> bayes_sim_results
+s <- sum(bayes_sim_results)
+s
+```
+
+That's an interesting result.  `r s` intervals out of 10000 intervals excluded zero, while using weakly informative priors and no correction.
+
+
+How many times did we see atleast one pairwise comparison significant?   
+
+```{r}
+t <- (1000 - sum(bayes_sim_results==0))
+t
+```
+
+
+Only `r t` models run had atleast one pairwise comparison exclude zero - that's an error rate of `r t/1000`  
+
+This is without any correction, without controlling for an false positive rate whatsover.  It's a result of partial pooling or "shrinkage", where the model learns information about the group to inform it's own estimate.  
+
+For a visual representation, below is a comparison of the number of significant comparisons vs the model.  
+
+If I've gone about my simulation excercise correctly and have made the right assumptions, this is quite an interesting result!  
+
+
+```{r}
+as.data.frame(cbind(rep(1:1000), naive_p,tukey_p,bayes_sim_results)) %>%
+  gather(key = "type", value = "number_sig", -c(V1)) %>%
+  rename(seed = V1) %>%
+  ggplot(., aes(seed,number_sig)) + geom_point(size = 0.5,alpha = 0.5) + facet_wrap(vars(group = type))
+```
+
+## Discussion  
+The above simulation excercise indicates that estimating effects in an ANOVA under a multi-level framework is associated with a much lower false positive error rate, even when compared to the correction used in a frequentist inference.  
+
+I would love to hear your thoughts on this and whether or not I've gone about making the right assumptions in the simualtion.  This is a topic I've been struggling to get my head around, so any comments are welcomed!  
+
+Thank you for reading!
+
+
+
+
