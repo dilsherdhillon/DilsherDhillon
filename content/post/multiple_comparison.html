@@ -1,21 +1,21 @@
 ---
-title: "Multiple Comparisons and Bayesian Inference"
-date: "2019-08-02"
-output:
-  html_document: 
-    highlight: kate
-    theme: readable
-    toc: yes
-    toc_depth: 4
-    toc_float: yes
+title: "Multiple Comparisons and Bayesian Inference"  
+date: "2019-08-02"  
+output:  
+  html_document:   
+    highlight: kate  
+    theme: readable  
+    toc: yes  
+    toc_depth: 4  
+    toc_float: yes  
 ---
 
 
 
 <div id="motivation" class="section level1">
 <h1>Motivation</h1>
-<p>They say the best way to learn something, is to teach it! And that’s exactly what I intend to do. Inspired by Solomon Kurtz blog posts on power calcualtions in bayesian inference, and Dr. Gelman’s blogs, here’s an attempt to open the guts of a problem I’ve struggled with.<br />
-I don’t have a whole lot of experience in simualtions, so looking forward hearing how I can improve my assumptions to reach a valid conclusion.</p>
+<p>They say the best way to learn something, is to teach it! And that’s exactly what I intend to do. Inspired by <a href="https://solomonkurz.netlify.com/post/bayesian-power-analysis-part-i/">Solomon Kurz’s</a> blog posts on power calcualtions in bayesian inference, and Dr. Gelman’s blogs, here’s an attempt to open the guts of a problem I’ve struggled with.<br />
+I don’t have a whole lot of experience in simulations, so looking forward hearing how I can improve my assumptions to reach a valid conclusion.</p>
 </div>
 <div id="background" class="section level1">
 <h1>Background</h1>
@@ -27,7 +27,7 @@ I don’t have a whole lot of experience in simualtions, so looking forward hear
 <p>Another is the <em>multiple testing</em> problem, more the number of post-hoc comparisons, the more likely we are to reject the null and make a type I error. That’s when you have the bonferroni’s, the tukey’s, the dunnett’s to control for the family wise error rate.</p>
 <p>This got me wondering, does a bayesian worry about multiple testing? Even though making a type I error is associated with rejecting the null, when in fact the null is true, which is a freqeuntist paradigm - a bayesian should still be concerned about an uncertainity interval excluding 0, when in fact, 0 is a plausible value in the posterior distribution.</p>
 <p>And so a quick google-fu later, of course, Dr. Gelman has written a lot about this topic. <a href="https://statmodeling.stat.columbia.edu/2016/08/22/bayesian-inference-completely-solves-the-multiple-comparisons-problem/">This</a> blog post gives a nice intuitive explanation.</p>
-<p>The gist is, and hopefully I interpreted it correctly, if you’re putting a prior on your estimates, Dr. Gelman shows you’re less likely to conclude there is an effect when infact there’s none. This is because of the conservative nature of bayesian estimation.</p>
+<p>The gist is, and hopefully I interpreted it correctly, if you’re putting a prior on your estimates, Dr. Gelman shows you’re less likely to conclude there is an effect when infact there’s none.</p>
 <p>But what if, for example, like a recent study I analyzed, there’s a two-factorial design, with 6 levels to each factor, AND there’s an interaction going on so we’d like to test for differences in the 6 levels of one factor, at EVERY level of the factor. That’s 90 pairwise comparisons. It’s quite realistic to assume that you can’t put an informative prior on every single interaction estimate. What does one do in this situation? Well, the answer, if you haven’t already guessed it, are multilevel models. <a href="http://www.stat.columbia.edu/~gelman/research/published/AOS259.pdf">Here’s</a> the paper Dr. Gelman linked me to when I asked him about it.</p>
 <p>This post is too short to explain in detail what multilevel models are, but here are a few of the many resources available that would help get a sense of them.<br />
 <a href="https://cran.r-project.org/web/packages/rstanarm/vignettes/pooling.html">partial pooling using heirarchical models</a><br />
@@ -92,9 +92,11 @@ sim_results &lt;- purrr::map(seeds, function(x)
 <p>We’ll separate out the naive p-vaues and the tukey adjusted p values. I’ve used the 0.05 threshold to call out if something is significant or not.</p>
 <pre class="r"><code>naive_p &lt;- sapply(sim_results,`[[`,1) 
 tukey_p &lt;- sapply(sim_results,`[[`,2) </code></pre>
-<p>There’s two ways to look at it -
-1. Of the 1000 models run, how many TOTAL pairwise comparisons resulted in p&lt;0.05. This corresponds to 10 tests in each model, so a total of 10,000 tests.<br />
-2. On the other hand, of the 1000 models, how many had AT LEAST one signficant result? That corresponds to a 1000 tests.</p>
+<p>There’s two ways to look at it -</p>
+<ol style="list-style-type: decimal">
+<li><p>Of the 1000 models run, how many TOTAL pairwise comparisons resulted in p&lt;0.05. This corresponds to 10 tests in each model, so a total of 10,000 tests.</p></li>
+<li><p>On the other hand, of the 1000 models, how many had AT LEAST one signficant result? That corresponds to a 1000 tests.</p></li>
+</ol>
 <div id="naive" class="section level3">
 <h3>Naive</h3>
 <p>Total number of significant pairwise comparisons?</p>
