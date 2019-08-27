@@ -27,7 +27,7 @@ The post below will describe two things -
 2.  How to estimate the trend   
 3.  How to estimate the periods of change - the first derivatives of the trend.  
 
-If you've read my previous blog, you've probably figured out my love for the brms[link] package and the tidyverse set of packages.  So let's load them in.  
+If you've read my previous blog, you've probably figured out my love for the [brms](https://github.com/paul-buerkner/brms) package and the tidyverse set of packages.  So let's load them in.  
 
 *Side note* - I'm always amazed at the open source contributions.  None of the stuff below would have been possible by Simon Wood's unbeleivably powerful package [mgcv](https://cran.r-project.org/web/packages/mgcv/index.html)- it's an incredible library and I'm yet to grasp all of it's usecases.  
 
@@ -45,7 +45,7 @@ library(mgcv)
 
 ## Simulate data  
 
-The mgcv library has a really neat function `gamSim`, which let's you simulate non-linear data.  Let's simualate some data, and use the `eg` 4, which simluates data by group (3 groups by default). For more information on this check out the spline help page[link]
+The mgcv library has a really neat function `gamSim`, which let's you simulate non-linear data.  Let's simualate some data, and use the `eg` 4, which simluates data by group (3 groups by default). For more information on this check out the [spline help page](https://stat.ethz.ch/R-manual/R-devel/library/mgcv/html/smooth.terms.html)
 
 
 ```{r}

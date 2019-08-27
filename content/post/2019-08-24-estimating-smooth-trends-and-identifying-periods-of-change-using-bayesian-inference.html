@@ -23,7 +23,7 @@ I’m an avid reader of Dr. Gavin Simpsons’s blog and papers, and he’s writ
 1. How to model a time series using splines within a bayesian framework<br />
 2. How to estimate the trend<br />
 3. How to estimate the periods of change - the first derivatives of the trend.</p>
-<p>If you’ve read my previous blog, you’ve probably figured out my love for the brms[link] package and the tidyverse set of packages. So let’s load them in.</p>
+<p>If you’ve read my previous blog, you’ve probably figured out my love for the <a href="https://github.com/paul-buerkner/brms">brms</a> package and the tidyverse set of packages. So let’s load them in.</p>
 <p><em>Side note</em> - I’m always amazed at the open source contributions. None of the stuff below would have been possible by Simon Wood’s unbeleivably powerful package <a href="https://cran.r-project.org/web/packages/mgcv/index.html">mgcv</a>- it’s an incredible library and I’m yet to grasp all of it’s usecases.</p>
 <p>Back to business - let’s load in the libraries we need.<br />
 ## Libraries</p>
@@ -34,7 +34,7 @@ library(brms)
 library(mgcv)</code></pre>
 <div id="simulate-data" class="section level2">
 <h2>Simulate data</h2>
-<p>The mgcv library has a really neat function <code>gamSim</code>, which let’s you simulate non-linear data. Let’s simualate some data, and use the <code>eg</code> 4, which simluates data by group (3 groups by default). For more information on this check out the spline help page[link]</p>
+<p>The mgcv library has a really neat function <code>gamSim</code>, which let’s you simulate non-linear data. Let’s simualate some data, and use the <code>eg</code> 4, which simluates data by group (3 groups by default). For more information on this check out the <a href="https://stat.ethz.ch/R-manual/R-devel/library/mgcv/html/smooth.terms.html">spline help page</a></p>
 <pre class="r"><code>set.seed(08242019)
 dta &lt;- mgcv::gamSim(eg = 4, n = 2000, scale = 2)</code></pre>
 <pre><code>## Factor `by&#39; variable example</code></pre>
