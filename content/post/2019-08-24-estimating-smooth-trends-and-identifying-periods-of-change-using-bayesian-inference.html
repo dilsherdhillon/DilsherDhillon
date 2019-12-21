@@ -69,10 +69,10 @@ ggplot(.,aes(x2,y, group = fac)) + geom_point(aes(color = fac))</code></pre>
   ), control = list(adapt_delta = 0.95), iter = 2000
 )
 
-saveRDS(mod,&quot;/Users/dilsherdhillon/Documents/Website/DilsherDhillon/static/files/mod_spline.rds&quot;)</code></pre>
+saveRDS(mod,&quot;/Users/dilsherdhillon/Documents/DilsherDhillon/static/files/mod_spline.rds&quot;)</code></pre>
 <p><strong>Posterior checks</strong> -<br />
 A cursory look at the posterior predictive distribution looks reasonable. In practice, we would want to compare the means of the posterior draws, potentially by group to see if there’s any mis specifications. For now we’ll move on to the estimating the trends!</p>
-<pre class="r"><code>mod &lt;- readRDS(&quot;/Users/dilsherdhillon/Documents/Website/DilsherDhillon/static/files/mod_spline.rds&quot;)
+<pre class="r"><code>mod &lt;- readRDS(&quot;/Users/dilsherdhillon/Documents/DilsherDhillon/static/files/mod_spline.rds&quot;)
 
 pp_check(mod, nsamples = 100)</code></pre>
 <p><img src="/post/2019-08-24-estimating-smooth-trends-and-identifying-periods-of-change-using-bayesian-inference_files/figure-html/unnamed-chunk-6-1.png" width="672" /></p>

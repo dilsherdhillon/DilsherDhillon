@@ -1,6 +1,6 @@
 ---
 title: "Multiple Comparisons and Bayesian Inference"  
-date: "2019-08-02"  
+date: "2019-12-21"  
 output:  
   html_document:   
     highlight: kate  
@@ -14,29 +14,34 @@ output:
 
 <div id="motivation" class="section level1">
 <h1>Motivation</h1>
-<p>They say the best way to learn something, is to teach it! And that’s exactly what I intend to do. Inspired by <a href="https://solomonkurz.netlify.com/post/bayesian-power-analysis-part-i/">Solomon Kurz’s</a> blog posts on power calcualtions in bayesian inference, and Dr. Gelman’s blogs, here’s an attempt to open the guts of a problem I’ve struggled with.<br />
-I don’t have a whole lot of experience in simulations, so looking forward hearing how I can improve my assumptions to reach a valid conclusion.</p>
+<p>They say the best way to learn something, is to teach it! And that’s exactly what I intend to do. Inspired by <a href="https://solomonkurz.netlify.com/post/bayesian-power-analysis-part-i/">Solomon Kurz’s</a> blog posts on power calcualtions in bayesian inference, and Dr. Gelman’s blogs, here’s an attempt to open the guts of a problem I’ve struggled with.</p>
+<p><strong>I don’t have a whole lot of experience in simulations, so looking forward hearing how I can improve my assumptions to reach a valid conclusion.</strong></p>
 </div>
 <div id="background" class="section level1">
 <h1>Background</h1>
-<p>As an applied statistician, trained primarily under a frequentist paradigm, I’ve been taught and have used frequentist inference for all the work I’ve done - up until sometime last year. Except for that one bayesian class in school, which focused on laying the mathematical statistics and probability distribution ground work, I really was never exposed to tools to use bayesian inference in an applied setting. Although I thank the 2017 me for taking that elective, since it’s helped me better gain an intuition for bayesian inference.</p>
+<p>As an applied statistician, trained primarily under a frequentist paradigm, I’ve been taught and have used frequentist inference for all the work I’ve done - up until sometime last year. Except for that one bayesian class in school, which focused on laying the probability distribution ground work, I really was never exposed to tools to use bayesian inference in an applied setting. Although I thank the 2017 me for taking that elective, since it’s helped me better understand the tools available for bayesian inference in a applied setting(looking at you <a href="https://mc-stan.org/">Stan</a> and <a href="https://github.com/paul-buerkner/brms">brms</a>.</p>
 </div>
-<div id="applied-bayesian-inference" class="section level1">
-<h1>Applied Bayesian Inference</h1>
-<p>I work in an industry where there is a heavy emphasis on design of experiments(DOE). And with DOE, come a whole host of other things to take into consideration. A very common error is to misinterpret the design and analyze it differently than it should have been (the <a href="https://newonlinecourses.science.psu.edu/stat503/node/71/">split plot</a> comes to mind, where care needs to be taken to account for the split plot error).</p>
-<p>Another is the <em>multiple testing</em> problem, more the number of post-hoc comparisons, the more likely we are to reject the null and make a type I error. That’s when you have the bonferroni’s, the tukey’s, the dunnett’s to control for the family wise error rate.</p>
-<p>This got me wondering, does a bayesian worry about multiple testing? Even though making a type I error is associated with rejecting the null, when in fact the null is true, which is a freqeuntist paradigm - a bayesian should still be concerned about an uncertainity interval excluding 0, when in fact, 0 is a plausible value in the posterior distribution.</p>
-<p>And so a quick google-fu later, of course, Dr. Gelman has written a lot about this topic. <a href="https://statmodeling.stat.columbia.edu/2016/08/22/bayesian-inference-completely-solves-the-multiple-comparisons-problem/">This</a> blog post gives a nice intuitive explanation.</p>
-<p>The gist is, and hopefully I interpreted it correctly, if you’re putting a prior on your estimates, Dr. Gelman shows you’re less likely to conclude there is an effect when infact there’s none.</p>
-<p>But what if, for example, like a recent study I analyzed, there’s a two-factorial design, with 6 levels to each factor, AND there’s an interaction going on so we’d like to test for differences in the 6 levels of one factor, at EVERY level of the factor. That’s 90 pairwise comparisons. It’s quite realistic to assume that you can’t put an informative prior on every single interaction estimate. What does one do in this situation? Well, the answer, if you haven’t already guessed it, are multilevel models. <a href="http://www.stat.columbia.edu/~gelman/research/published/AOS259.pdf">Here’s</a> the paper Dr. Gelman linked me to when I asked him about it.</p>
-<p>This post is too short to explain in detail what multilevel models are, but here are a few of the many resources available that would help get a sense of them.<br />
+<div id="bayesian-inference-and-anova" class="section level1">
+<h1>Bayesian Inference and ANOVA</h1>
+<p>I work in an industry where there is a heavy emphasis on design of experiments(DOE). Since experimentation can sometimes be expensive, and there are factors that are hard to change, analyzing these experiments is almost never a simple ANOVA or ANCOVA - it almost always requires you to get the structure of the problem correct.
+For example, a very common error is not being able to spot a <a href="https://newonlinecourses.science.psu.edu/stat503/node/71/">split plot</a> design. Where one of the factors is randomized first, and then the second factor is applied “on” the first.</p>
+<p>Another is the <em>multiple comparison</em> problem, the theme of this post, where more the number of post-hoc comparisons, the more likely we are to reject the null and make a type I error. That’s when you have the bonferroni’s, the tukey’s, the dunnett’s to control for the family wise error rate. There’s extensive work done in this, and Tukey is well accepted post-hoc correction.</p>
+<p><strong>But what about multiple comparisons in bayesian inference?</strong></p>
+<p>Does a bayesian worry about multiple testing? Even though making a type I error is associated with rejecting the null, when in fact the null is true, which is a frequentist paradigm - a bayesian may still be concerned about an uncertainity interval excluding 0, when in fact, 0 is a plausible value in the posterior distribution.</p>
+<p>And so a quick google-fu later, of course, Dr. Gelman has written a lot about this topic. <a href="https://statmodeling.stat.columbia.edu/2016/08/22/bayesian-inference-completely-solves-the-multiple-comparisons-problem/">This</a> blog post gives a nice intuitive explanation. Also, if you have a copy of his book BDA 3rd edition, page 96 goes over this too.</p>
+<p>The gist is, if you’re putting a prior on your paramters, Dr. Gelman shows you’re less likely to conclude there is an effect when infact there’s none. So if you examine your a priori beliefs and put regularizing priors on your parameters, your estimates tend to be <em>skeptical</em> of the data, and hence, you’re less likely to conclude that 0 is not a plausible value of the posterior distribution of the parameters.</p>
+<p>But what if, for example, like a recent study I analyzed, there’s a two-factorial design, with 6 levels to each factor, AND there’s an interaction going on so we’d like to test for differences in the 6 levels of one factor, at EVERY level of the factor. That’s 90 pairwise comparisons. It’s quite realistic to assume that you can’t put an informative prior on every single interaction estimate. What does one do in this situation? Well, the answer, if you haven’t already guessed it, are <strong>multilevel</strong> models. <a href="http://www.stat.columbia.edu/~gelman/research/published/AOS259.pdf">Here’s</a> the paper Dr. Gelman linked me to when I asked him about it. He argues every analysis should be run as a multilevel model.</p>
+<p>This post is too short to explain in detail what multilevel models are but if you’ve ever taken a class or looked through a tutorial of mixed effect models, where one of the factors is a considered a “random effect”, well in this case, <strong>every</strong> factor is a random effect.</p>
+<p>Here are a few of the many resources available that would help get a sense of them.<br />
 <a href="https://cran.r-project.org/web/packages/rstanarm/vignettes/pooling.html">partial pooling using heirarchical models</a><br />
 <a href="https://www.tjmahr.com/plotting-partial-pooling-in-mixed-effects-models/">Plotting partial pooling models using lme4</a></p>
-<p>Everyone in my team swears by frequentist approaches, and I’m not saying they’re wrong, in fact, the way they approach their analysis is very similar to bayesian inference (using subject matter expertise to pre-specify a model, avoiding the garden of forking paths.. and such). But hopefully I can come up with an intutive demonstration to show why we should be running our ANOVAs as multilevel models, and not worry about what’s a fixed effect vs a random effect.</p>
+<p>We’ll see below that in fact, a running a multilevel model, you’re less likely as compared with a fixed effect ANOVA model without controlling multiple comparisons, but also as compared to comparing with Tukey controlled estimates.</p>
+<p>In addition, we’ll build the multilevel models using the bayesian inference engine Stan.<br />
+<strong>Note</strong> - Multilevel models can also be constructed using frequentist methods - library <code>lmer</code> will do this but as Gelman points out in Chapter 5 of BDA, there’s challenges with this especially when we’re working with small sample sizes (negative standard deviations). Whereas under a bayesian framework, you place priors on the standard deviations that restrict them to realistic values.</p>
 </div>
 <div id="simulation-set-up" class="section level1">
 <h1>Simulation Set up</h1>
-<p>As noted before, I haven’t done a lot of simulations, except for power analysis etc, so this is a very crude attempt at setting up a simple simulation. We’ll compare three simulations.<br />
+<p>We’ll compare three simulations.<br />
 1. A one - way ANOVA with 5 levels of a factor, conducting 10 pairwise comparisons, without controlling the Type 1 error<br />
 2. A one - way ANOVA with 5 levels of a factor, conducting 10 pairwise comparisons, controlling for Type 1 error using the Tukey correction<br />
 3. A one - way ANOVA with 5 levels of a factor, but estimated using a multilevel model, pooling estimates from other groups, under a bayesian framework.</p>
@@ -45,7 +50,7 @@ I don’t have a whole lot of experience in simulations, so looking forward hear
 <h2>Frequentist pairwise comparisons</h2>
 <p>Let’s set up a simple linear model with 5 groups, and each group has 5 replications each.</p>
 <pre class="r"><code>library(tidyverse)
-#library(brms)
+library(brms)
 library(emmeans)</code></pre>
 <pre class="r"><code>## these are the names of all the dogs I&#39;ve had :) 
 treatmentA &lt;-rep(c(&quot;snoopy&quot;,&quot;ginger&quot;,&quot;sugar&quot;,&quot;spicy&quot;,&quot;lisa&quot;), times = 3)
@@ -81,9 +86,7 @@ sim_aov &lt;- function(seed) {
     dplyr::filter(p.value &lt; 0.05) %&gt;%
     nrow(.)
   
-  output &lt;- list(n_naive, n_tukey)
-  
-  
+  output &lt;- list(n_naive, n_tukey)  
 }</code></pre>
 <p>Now we’re ready to simulate the above models!</p>
 <pre class="r"><code>seeds &lt;- rep(1:1000)
@@ -121,23 +124,23 @@ t</code></pre>
 <pre><code>## [1] 58</code></pre>
 <p>Dropped down to an error rate of 0.058</p>
 <p>Seems like Tukey correction is actually doing it’s job, which is good news.</p>
-<p>Let’s move on to the bayesian comparison now!</p>
+<p>Let’s move on to the multilevel models now!</p>
 </div>
 </div>
-<div id="bayesian-comparisons" class="section level2">
-<h2>Bayesian Comparisons</h2>
+<div id="multilevel-model" class="section level2">
+<h2>Multilevel Model</h2>
 <p>Let’s first run a one-model example and we’ll write a function for it to then iterate over simualted data sets. Let’s introduce <a href="https://github.com/paul-buerkner/brms">Paul Buerkner’s</a> <code>brms</code> library.</p>
 <p>Instead of estimating the LS means, we’ll estimating separate intercepts for each level in the factor. The syntax is very similar to <code>lme4</code>. For more information on brms and it’s documentation, <a href="https://github.com/paul-buerkner/brms">check out the github rep</a></p>
 <pre class="r"><code>library(brms)
-d_bayes &lt;- data.frame(treatmentA = as_factor(rep(c(1,2,3,4,5), each = 3)), response = rnorm(15,10,20))
+d_bayes &lt;- data.frame(treatmentA = as_factor(rep(c(1,2,3,4,5), each = 3)), response = rnorm(15,0,2))
 ## initialize the model  
 mod_brms &lt;- brms::brm(response ~  (1|treatmentA), data = d_bayes, chains = 4, cores = 4, 
                       prior = c(
-    prior(normal(10, 5), &quot;Intercept&quot;),
-    prior(student_t(3, 0, 15), &quot;sd&quot;),
-    prior(student_t(3, 0, 15), &quot;sigma&quot;)), family = gaussian)
+    prior(normal(0, 2), &quot;Intercept&quot;),
+    prior(student_t(3, 0, 1), &quot;sd&quot;),
+    prior(student_t(3, 0, 2), &quot;sigma&quot;)), family = gaussian)
 ## We&#39;ll be using weakly informative priors 
-saveRDS(mod_brms,&quot;/Users/dilsherdhillon/Documents/Website/DilsherDhillon/static/files/mod_brms.rds&quot;)</code></pre>
+saveRDS(mod_brms,&quot;/Users/dilsherdhillon/Documents/DilsherDhillon/static/files/mod_brms.rds&quot;)</code></pre>
 <p>NB -
 The same model can be run using the <code>rethinking</code> library by Dr. McElreath. Since I’m currently going through his lectures and homeworks, I’d be remiss if I didn’t show you how to do it using <code>rethinking</code></p>
 <pre class="r"><code>data_list &lt;- list(
@@ -151,27 +154,27 @@ f &lt;- alist(
   ## adaptive priors  
   a_trt[treatmentA] ~ dnorm(a_bar, sigma_A),
   ## hyper priors  
-  a_bar ~ dnorm(0,1.5),
+  a_bar ~ dnorm(0,1),
   sigma ~ dexp(1),
   sigma_A ~ dexp(1)
  )
 mod &lt;- rethinking::ulam(
-  f, data = data_list, chains = 4, iter = 8000, control=list(adapt_delta=0.99), cores = 4
+  f, data = data_list, chains = 4, iter = 2000, control=list(adapt_delta=0.95), cores = 4
 )
 ## You&#39;ll notice I used different priors, but it really doesn&#39;t matter in the context of this problem.   
 ## THIS CODE NOT RUN  </code></pre>
 <p>Pairwise comparisons aren’t as straightforward as a linear model we ran above. We’ll first need to extract out the estimates from the posterior, and compute these pairwise differences and their 95% intervals by hand. It’s more fun this way!</p>
-<pre class="r"><code>mod_brms &lt;- readRDS(&quot;/Users/dilsherdhillon/Documents/Website/DilsherDhillon/static/files/mod_brms.rds&quot;)
+<pre class="r"><code>mod_brms &lt;- readRDS(&quot;/Users/dilsherdhillon/Documents/DilsherDhillon/static/files/mod_brms.rds&quot;)
 ## extract the intercepts  
   post &lt;- brms::posterior_samples(mod_brms) %&gt;% 
     select(contains(&quot;r_treatmentA&quot;))
 str(post) </code></pre>
 <pre><code>## &#39;data.frame&#39;:    4000 obs. of  5 variables:
-##  $ r_treatmentA[1,Intercept]: num  2.44 1.73 -9 5.34 -1.47 ...
-##  $ r_treatmentA[2,Intercept]: num  2.26 1.16 -6.97 8.13 -5.21 ...
-##  $ r_treatmentA[3,Intercept]: num  -1.7059 3.5734 -1.0209 3.619 -0.0872 ...
-##  $ r_treatmentA[4,Intercept]: num  -3.81 -4.49 -1.04 -1.94 -1.06 ...
-##  $ r_treatmentA[5,Intercept]: num  5.69 -1.31 5.53 -4.34 5.73 ...</code></pre>
+##  $ r_treatmentA[1,Intercept]: num  9.72e-05 -1.30e-03 -2.47e-03 -8.70e-01 -3.49e-01 ...
+##  $ r_treatmentA[2,Intercept]: num  -0.001619 -0.000941 -0.002774 0.13095 -0.036746 ...
+##  $ r_treatmentA[3,Intercept]: num  0.00323 0.00545 0.00535 -0.73711 -0.3627 ...
+##  $ r_treatmentA[4,Intercept]: num  -0.000601 -0.000492 -0.0003 -1.332787 -0.877247 ...
+##  $ r_treatmentA[5,Intercept]: num  0.000691 0.002601 0.002058 2.036914 1.383762 ...</code></pre>
 <p>We’ll make use of the helpful <code>outer</code> function and some more wrangling to get it in the right format.</p>
 <pre class="r"><code>pairs &lt;- outer(colnames(post), colnames(post), paste, sep = &quot;-&quot;)
 index &lt;-  which(lower.tri(pairs, diag = TRUE))
@@ -183,16 +186,16 @@ comparisons &lt;- comparisons[-index]
 
 str(comparisons)  </code></pre>
 <pre><code>## &#39;data.frame&#39;:    4000 obs. of  10 variables:
-##  $ r_treatmentA[1,Intercept]-r_treatmentA[2,Intercept]: num  0.178 0.57 -2.036 -2.791 3.737 ...
-##  $ r_treatmentA[1,Intercept]-r_treatmentA[3,Intercept]: num  4.14 -1.85 -7.98 1.72 -1.38 ...
-##  $ r_treatmentA[2,Intercept]-r_treatmentA[3,Intercept]: num  3.97 -2.42 -5.95 4.51 -5.12 ...
-##  $ r_treatmentA[1,Intercept]-r_treatmentA[4,Intercept]: num  6.244 6.215 -7.964 7.278 -0.415 ...
-##  $ r_treatmentA[2,Intercept]-r_treatmentA[4,Intercept]: num  6.07 5.65 -5.93 10.07 -4.15 ...
-##  $ r_treatmentA[3,Intercept]-r_treatmentA[4,Intercept]: num  2.1012 8.063 0.0186 5.5595 0.9683 ...
-##  $ r_treatmentA[1,Intercept]-r_treatmentA[5,Intercept]: num  -3.26 3.03 -14.54 9.68 -7.2 ...
-##  $ r_treatmentA[2,Intercept]-r_treatmentA[5,Intercept]: num  -3.43 2.46 -12.5 12.47 -10.94 ...
-##  $ r_treatmentA[3,Intercept]-r_treatmentA[5,Intercept]: num  -7.4 4.88 -6.55 7.96 -5.82 ...
-##  $ r_treatmentA[4,Intercept]-r_treatmentA[5,Intercept]: num  -9.5 -3.18 -6.57 2.4 -6.79 ...</code></pre>
+##  $ r_treatmentA[1,Intercept]-r_treatmentA[2,Intercept]: num  0.00172 -0.00036 0.0003 -1.0013 -0.31268 ...
+##  $ r_treatmentA[1,Intercept]-r_treatmentA[3,Intercept]: num  -0.00313 -0.00675 -0.00783 -0.13324 0.01328 ...
+##  $ r_treatmentA[2,Intercept]-r_treatmentA[3,Intercept]: num  -0.00485 -0.00639 -0.00813 0.86806 0.32596 ...
+##  $ r_treatmentA[1,Intercept]-r_treatmentA[4,Intercept]: num  0.000698 -0.000809 -0.002174 0.462436 0.527824 ...
+##  $ r_treatmentA[2,Intercept]-r_treatmentA[4,Intercept]: num  -0.001017 -0.000449 -0.002474 1.463736 0.840501 ...
+##  $ r_treatmentA[3,Intercept]-r_treatmentA[4,Intercept]: num  0.00383 0.00594 0.00565 0.59568 0.51454 ...
+##  $ r_treatmentA[1,Intercept]-r_treatmentA[5,Intercept]: num  -0.000593 -0.003902 -0.004532 -2.907265 -1.733185 ...
+##  $ r_treatmentA[2,Intercept]-r_treatmentA[5,Intercept]: num  -0.00231 -0.00354 -0.00483 -1.90596 -1.42051 ...
+##  $ r_treatmentA[3,Intercept]-r_treatmentA[5,Intercept]: num  0.00254 0.00285 0.00329 -2.77402 -1.74647 ...
+##  $ r_treatmentA[4,Intercept]-r_treatmentA[5,Intercept]: num  -0.00129 -0.00309 -0.00236 -3.3697 -2.26101 ...</code></pre>
 <p>Now we want all the comparisons, that excluded zero, in either direction (Dr. Gelman calls this the Type S error, but that’s outside the scope of this post)</p>
 <pre class="r"><code>  ## this gets us the number of comparisons that excluded zero  
   comparisons %&gt;%
@@ -209,11 +212,11 @@ str(comparisons)  </code></pre>
     dplyr::pull()</code></pre>
 <pre><code>## [1] 0</code></pre>
 <p>Now that we’ve opened the guts of how to do it, let’s package all of the above into a function that we can then iterate over multiple simualted datasets.</p>
-<pre class="r"><code>bayes_aov_sim &lt;- function(seed) {
+<pre class="r"><code>multilevel_aov_sim &lt;- function(seed) {
   set.seed(seed)
   d_bayes &lt;-
     tibble(treatmentA = rep(c(1, 2, 3, 4, 5), each = 3),
-           response = rnorm(15, 10, 20))
+           response = rnorm(15, 0, 2))
   
   ## before running the function, we&#39;ll initialize a base model and update it - it&#39;s faster because it avoids recompiling the model in stan.
   
@@ -223,7 +226,7 @@ str(comparisons)  </code></pre>
   post &lt;- brms::posterior_samples(mod_brms) %&gt;%
     select(contains(&quot;r_treatmentA&quot;))
   
-  
+  ## make all the comparison between pairs   
   pairs &lt;- outer(colnames(post), colnames(post), paste, sep = &quot;-&quot;)
   index &lt;-  which(lower.tri(pairs, diag = TRUE))
   comparisons &lt;- outer(1:ncol(post), 1:ncol(post),
@@ -254,40 +257,44 @@ str(comparisons)  </code></pre>
     pull()
 } </code></pre>
 <pre class="r"><code>## we use the model mod_brms we initialized before  
-
 seeds &lt;- sample(1:10000,1000, replace = FALSE)
 t1 &lt;- Sys.time()
-out &lt;- purrr::map(seeds, ~bayes_aov_sim(seed = .x))
+out &lt;- purrr::map(seeds, ~multilevel_aov_sim(seed = .x))
 t2 &lt;- Sys.time()
 t2-t1
-saveRDS(out, &quot;/Users/dilsherdhillon/Documents/Website/DilsherDhillon/static/files/out.rds&quot;)</code></pre>
-<p>This took about ~ 18 minutes to run on my computer.</p>
-<pre class="r"><code>bayes_sim_results &lt;- readRDS(&quot;/Users/dilsherdhillon/Documents/Website/DilsherDhillon/static/files/out.rds&quot;)</code></pre>
+saveRDS(out, &quot;/Users/dilsherdhillon/Documents/DilsherDhillon/static/files/out.rds&quot;)</code></pre>
+<p>This took about ~ 18 minutes to run on my fairly recent macbook.</p>
+<pre class="r"><code>multilevel_sim_results &lt;- readRDS(&quot;/Users/dilsherdhillon/Documents/DilsherDhillon/static/files/out.rds&quot;)</code></pre>
 <p><strong>Results</strong></p>
 <p>How many total pairwise comparisons excluded 0 in their 95% uncertainity intervals?</p>
-<pre class="r"><code>bayes_sim_results %&gt;% purrr::simplify() -&gt; bayes_sim_results
-s &lt;- sum(bayes_sim_results)
+<pre class="r"><code>multilevel_sim_results %&gt;% purrr::simplify() -&gt; multilevel_sim_results
+s &lt;- sum(multilevel_sim_results)
 s</code></pre>
-<pre><code>## [1] 54</code></pre>
-<p>That’s an interesting result. 54 intervals out of 10000 intervals excluded zero, while using weakly informative priors and no correction.</p>
+<pre><code>## [1] 26</code></pre>
+<p>That’s an interesting result. 26 intervals out of 10000 intervals excluded zero, while using weakly informative priors and no correction.</p>
 <p>How many times did we see atleast one pairwise comparison significant?</p>
-<pre class="r"><code>t &lt;- (1000 - sum(bayes_sim_results==0))
+<pre class="r"><code>t &lt;- (1000 - sum(multilevel_sim_results==0))
 t</code></pre>
-<pre><code>## [1] 17</code></pre>
-<p>Only 17 models run had atleast one pairwise comparison exclude zero - that’s an error rate of 0.017</p>
+<pre><code>## [1] 10</code></pre>
+<p>Only 10 models run had atleast one pairwise comparison exclude zero - that’s an error rate of 0.01</p>
 <p>This is without any correction, without controlling for an false positive rate whatsover. It’s a result of partial pooling or “shrinkage”, where the model learns information about the group to inform it’s own estimate.</p>
-<p>For a visual representation, below is a comparison of the number of significant comparisons vs the model.</p>
-<p>If I’ve gone about my simulation excercise correctly and have made the right assumptions, this is quite an interesting result!</p>
-<pre class="r"><code>as.data.frame(cbind(rep(1:1000), naive_p,tukey_p,bayes_sim_results)) %&gt;%
+<p>For a visual representation, below is a comparison of the number of significant comparisons vs the model. For eg, the proportion of times atleast one pairwise comparison 95 % interval (incorrectly) excluded zero is ~12.5 % for a no correction Naive model, ~5 % of Tukey correction and &lt;1 % for a multilevel model.</p>
+<pre class="r"><code>as.data.frame(cbind(rep(1:1000), naive_p,tukey_p,multilevel_sim_results)) %&gt;%
+  rename(Multilevel_Model = multilevel_sim_results, Naive = naive_p, Tukey = tukey_p) %&gt;%
   gather(key = &quot;type&quot;, value = &quot;number_sig&quot;, -c(V1)) %&gt;%
   rename(seed = V1) %&gt;%
-  ggplot(., aes(seed,number_sig)) + geom_point(size = 0.5,alpha = 0.5) + facet_wrap(vars(group = type))</code></pre>
+  group_by(type) %&gt;%
+  count(number_sig) %&gt;%
+  ggplot(.,aes(number_sig, n/1000)) + geom_point(aes(color = type)) + 
+  labs(title = &quot;&quot;,
+       x = &quot;Number of pairwise comparisons intervals excluding zero&quot;,
+       y = &quot;Proportion&quot;)</code></pre>
 <p><img src="/post/multiple_comparison_files/figure-html/unnamed-chunk-19-1.png" width="672" /></p>
 </div>
-<div id="discussion" class="section level2">
-<h2>Discussion</h2>
-<p>The above simulation excercise indicates that estimating effects in an ANOVA under a multi-level framework is associated with a much lower false positive error rate, even when compared to the correction used in a frequentist inference.</p>
-<p>I would love to hear your thoughts on this and whether or not I’ve gone about making the right assumptions in the simualtion. This is a topic I’ve been struggling to get my head around, so any comments are welcomed!</p>
+<div id="conclusion" class="section level2">
+<h2>Conclusion</h2>
+<p>The above simulation excercise demonstrates that estimating effects under a multi-level framework is associated with a much lower false positive error rate, even when compared to the correction used in a frequentist inference. Since multilevel models are skeptical of extreme data, are able to “learn” from other groups, we are more likely to obtain precise intervals as compared to the traditional ANOVAs.</p>
+<p>I would love to hear your thoughts on this and any comments are welcomed!</p>
 <p>Thank you for reading!</p>
 </div>
 </div>

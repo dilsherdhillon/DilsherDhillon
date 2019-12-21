@@ -94,7 +94,7 @@ mod <- brms::brm(
   ), control = list(adapt_delta = 0.95), iter = 2000
 )
 
-saveRDS(mod,"/Users/dilsherdhillon/Documents/Website/DilsherDhillon/static/files/mod_spline.rds")
+saveRDS(mod,"/Users/dilsherdhillon/Documents/DilsherDhillon/static/files/mod_spline.rds")
 ```
 
 
@@ -102,7 +102,7 @@ saveRDS(mod,"/Users/dilsherdhillon/Documents/Website/DilsherDhillon/static/files
 A cursory look at the posterior predictive distribution looks reasonable. In practice, we would want to compare the means of the posterior draws, potentially by group to see if there's any mis specifications.  For now we'll move on to the estimating the trends! 
 
 ```{r}
-mod <- readRDS("/Users/dilsherdhillon/Documents/Website/DilsherDhillon/static/files/mod_spline.rds")
+mod <- readRDS("/Users/dilsherdhillon/Documents/DilsherDhillon/static/files/mod_spline.rds")
 
 pp_check(mod, nsamples = 100)
 ```
