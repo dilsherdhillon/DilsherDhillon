@@ -53,17 +53,17 @@ enableGitInfo = true
 
   # Your details.
   name = "Dilsher Singh Dhillon"
-  role = "Statistician"
+  role = "Statistical Consultant"
 
   # Organizations/Affiliations.
   #   Separate multiple entries with a comma, using the form: `[ {name="Org1", url=""}, {name="Org2", url=""} ]`.
-  organizations = [ { name = "Baylor College of Medicine", url = "" } ]
+  organizations = [ { name = "Shell International Exploration and Production", url = "" } ]
 
   gravatar = false  # Get your avatar from Gravatar.com? (true/false)
   avatar = "IMG_6578.jpg"  # Specify an avatar image (in `static/img/` folder) or delete value to disable avatar.
 
   # Details for the Contact Widget
-  email = "dhillon88@tamu.edu"
+  email = "dhillon.dilsher@gmail.com"
   address = "1102 Feigin Center, Suite 630, Houston TX 77030"
   office_hours = """
   Monday 10:00 to 13:00\\
@@ -285,7 +285,7 @@ enableGitInfo = true
   [[params.social]]
      icon = "cv"
      icon_pack = "ai"
-     link = "files/cv.pdf"
+     link = "files/DilsherDhillon_0120_Statistician.pdf"
 
 # Navigation Links
 #   To link a homepage widget, specify the URL as a hash `#` followed by the filename of the
@@ -329,7 +329,7 @@ enableGitInfo = true
 # To enable, copy your resume/CV to `static/files/cv.pdf` and uncomment the lines below.
 [[menu.main]]
    name = "CV"
-   url = "files/cv.pdf"
+   url = "files/DilsherDhillon_0120_Statistician.pdf"
    weight = 5
 
 # Search.

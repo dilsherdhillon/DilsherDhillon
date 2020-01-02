@@ -1,16 +1,27 @@
 ---
 title: "Multiple Comparisons and Bayesian Inference"  
-date: "2019-12-21"  
-output:  
-  html_document:   
-    highlight: kate  
-    theme: readable  
-    toc: yes  
-    toc_depth: 4  
-    toc_float: yes  
+date: "2020-01-01"  
+output:
+  blogdown::html_page:
+    toc: true     
 ---
 
 
+<div id="TOC">
+<ul>
+<li><a href="#motivation">Motivation</a></li>
+<li><a href="#background">Background</a></li>
+<li><a href="#bayesian-inference-and-anova">Bayesian Inference and ANOVA</a></li>
+<li><a href="#simulation-set-up">Simulation Set up</a><ul>
+<li><a href="#frequentist-pairwise-comparisons">Frequentist pairwise comparisons</a><ul>
+<li><a href="#naive">Naive</a></li>
+<li><a href="#tukey-adjusted">Tukey adjusted</a></li>
+</ul></li>
+<li><a href="#multilevel-model">Multilevel Model</a></li>
+<li><a href="#conclusion">Conclusion</a></li>
+</ul></li>
+</ul>
+</div>
 
 <div id="motivation" class="section level1">
 <h1>Motivation</h1>

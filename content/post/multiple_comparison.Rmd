@@ -1,13 +1,9 @@
 ---  
 title: "Multiple Comparisons and Bayesian Inference"  
 date: "`r Sys.Date()`"  
-output:  
-  html_document:   
-    highlight: kate  
-    theme: readable  
-    toc: yes  
-    toc_depth: 4  
-    toc_float: yes  
+output:
+  blogdown::html_page:
+    toc: true     
 ---
 
 # Motivation  

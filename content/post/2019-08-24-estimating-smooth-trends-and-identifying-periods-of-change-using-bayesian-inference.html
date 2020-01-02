@@ -2,29 +2,37 @@
 title: "Estimating smooth trends and identifying periods of change using bayesian inference"
 author: "null"
 date: '2019-08-24'
-output:  
-  html_document:   
-    highlight: kate  
-    theme: readable  
-    toc: yes  
-    toc_depth: 4  
-    toc_float: yes  
+output:
+  blogdown::html_page:
+    toc: true     
 slug: estimating-smooth-trends-and-identifying-periods-of-change-using-bayesian-inference
 ---
 
 
+<div id="TOC">
+<ul>
+<li><a href="#introduction">Introduction</a></li>
+<li><a href="#simulate-data">Simulate data</a></li>
+<li><a href="#model">Model</a><ul>
+<li><a href="#estimating-trends">Estimating trends</a></li>
+<li><a href="#estimating-derivatives">Estimating Derivatives</a></li>
+<li><a href="#conclusion--">Conclusion -</a></li>
+</ul></li>
+</ul>
+</div>
 
+<div id="introduction" class="section level2">
+<h2>Introduction</h2>
 <p>As the title suggests, this post explores the powerful generalized additive models to model time-series data. More often than not, we associate modeling time-series data with forecasting i.e, understanding the underlying data generating process to then forecast the future.</p>
 <p>However, we could also be interested in understanding the nature of the current time-series, and also, <em>comparing</em> different time series. A recent client of ours came to me with an experiment where they were comparing 3 different formulations of an oil, and the adsorption was measured every second for 4500 seconds. They wanted to understand whether these different forumaltions differed in their absolute adsorption, but also, whether the rate of adsorption was different. Their data was highly non-linear, and a linear time trend would severly underfit the data.</p>
 <p><strong>Enter Generalized Additive Models</strong><br />
 I’m an avid reader of Dr. Gavin Simpsons’s blog and papers, and he’s written a whole lot about generalized additive models <a href="https://www.fromthebottomoftheheap.net/2017/10/10/difference-splines-i/">here</a> and <a href="https://www.biorxiv.org/content/10.1101/322248v2">here</a>. In the paper he pretty much describes exactly what I needed!</p>
-<p>His package <a href="https://github.com/gavinsimpson/gratia"><code>gratia</code></a> has very convinient functions to do everything I will describe, but since I’m adopting bayesian methods more and more, this post will detail how to replicate that under a bayesian paradigm.</p>
+<p>His package <a href="https://github.com/gavinsimpson/gratia"><code>gratia</code></a> has very convenient functions to do everything I will describe, but we’ll use the powerful <code>brms</code> library to perform this analysis in a fully bayesian way.</p>
 <p>The post below will describe two things -
 1. How to model a time series using splines within a bayesian framework<br />
 2. How to estimate the trend<br />
 3. How to estimate the periods of change - the first derivatives of the trend.</p>
-<p>If you’ve read my previous blog, you’ve probably figured out my love for the <a href="https://github.com/paul-buerkner/brms">brms</a> package and the tidyverse set of packages. So let’s load them in.</p>
-<p><em>Side note</em> - I’m always amazed at the open source contributions. None of the stuff below would have been possible by Simon Wood’s unbeleivably powerful package <a href="https://cran.r-project.org/web/packages/mgcv/index.html">mgcv</a>- it’s an incredible library and I’m yet to grasp all of it’s usecases.</p>
+<p><em>Side note</em> - I’m always amazed at the open source contributions. None of the stuff below would have been possible by Simon Wood’s unbeleivably powerful package <a href="https://cran.r-project.org/web/packages/mgcv/index.html">mgcv</a>- it’s an incredible library and I’m yet to grasp all of it’s use cases.</p>
 <p>Back to business - let’s load in the libraries we need.<br />
 ## Libraries</p>
 <pre class="r"><code>library(dplyr)
@@ -32,6 +40,7 @@ library(magrittr)
 library(ggplot2)
 library(brms)
 library(mgcv)</code></pre>
+</div>
 <div id="simulate-data" class="section level2">
 <h2>Simulate data</h2>
 <p>The mgcv library has a really neat function <code>gamSim</code>, which let’s you simulate non-linear data. Let’s simualate some data, and use the <code>eg</code> 4, which simluates data by group (3 groups by default). For more information on this check out the <a href="https://stat.ethz.ch/R-manual/R-devel/library/mgcv/html/smooth.terms.html">spline help page</a></p>
@@ -57,14 +66,14 @@ ggplot(.,aes(x2,y, group = fac)) + geom_point(aes(color = fac))</code></pre>
 <pre class="r"><code>dta_scale &lt;- dta %&gt;%
   mutate(y_scale = scale(y), fac = as.factor(fac))</code></pre>
 <pre class="r"><code>mod &lt;- brms::brm(
-  y ~ fac + s(x2, by = fac, bs = &quot;cs&quot;),
+  y ~ (1|fac) + s(x2, by = fac, bs = &quot;cs&quot;),
   data = dta_scale,
   chains = 4,
   cores = 2,
   prior = c(
     prior(student_t(3, 0, 1), class = sigma),
     prior(student_t(3, 0, 1), class = sds),
-    prior(student_t(3, 0, 1), class = b),
+    #prior(student_t(3, 0, 1), class = b),
     prior(student_t(3, 0, 2), class = Intercept)
   ), control = list(adapt_delta = 0.95), iter = 2000
 )
@@ -73,7 +82,6 @@ saveRDS(mod,&quot;/Users/dilsherdhillon/Documents/DilsherDhillon/static/files/mo
 <p><strong>Posterior checks</strong> -<br />
 A cursory look at the posterior predictive distribution looks reasonable. In practice, we would want to compare the means of the posterior draws, potentially by group to see if there’s any mis specifications. For now we’ll move on to the estimating the trends!</p>
 <pre class="r"><code>mod &lt;- readRDS(&quot;/Users/dilsherdhillon/Documents/DilsherDhillon/static/files/mod_spline.rds&quot;)
-
 pp_check(mod, nsamples = 100)</code></pre>
 <p><img src="/post/2019-08-24-estimating-smooth-trends-and-identifying-periods-of-change-using-bayesian-inference_files/figure-html/unnamed-chunk-6-1.png" width="672" /></p>
 <div id="estimating-trends" class="section level3">
@@ -81,24 +89,24 @@ pp_check(mod, nsamples = 100)</code></pre>
 <p>Now that we have our posterior distribution of the paramters, given our data, we can ask of it the inferences it’s making.</p>
 <pre class="r"><code>new_dta &lt;- expand.grid(x2 = seq(0, 1, length = 2000),
                        fac = c(&#39;1&#39;, &#39;2&#39;, &#39;3&#39;))
-predictions &lt;- brms::posterior_predict(mod, newdata = new_dta, summary = FALSE)
+predictions &lt;- brms::posterior_linpred(mod, newdata = new_dta, summary = FALSE)
 
 means &lt;- apply(predictions, MARGIN = 2,mean)
 lower &lt;- apply(predictions, MARGIN = 2,quantile, prob = 0.055)
 upper &lt;- apply(predictions, MARGIN = 2,quantile, prob = 0.945)</code></pre>
 <p>Construct a df with the means and the quantiles, including the variable x2 and the grouping factor and plot the predictions.</p>
-<p>We can see there’s a region in <code>x2</code> when factor 3 does not overlap with the other two factors. Factor 1 and 2 however don’t show evidence of having different trends.</p>
+<p>We clearly see differences in each of these factors, as expected, but they’re also differing in regions where they change. For eg, from 0 - 0.25, both <code>1</code> and <code>2</code> have a similar trend, but <code>3</code> seems to be increasing.</p>
 <pre class="r"><code>data.frame(means) %&gt;%
   cbind(lower) %&gt;%
   cbind(upper) %&gt;%
   cbind(new_dta) %&gt;%
-  ggplot(.,aes(x2, means, group = fac)) + geom_line(aes(color = fac)) + geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.1)</code></pre>
+  ggplot(.,aes(x2, means, group = fac)) + geom_line(aes(color = fac)) + 
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.1)</code></pre>
 <p><img src="/post/2019-08-24-estimating-smooth-trends-and-identifying-periods-of-change-using-bayesian-inference_files/figure-html/unnamed-chunk-8-1.png" width="672" /></p>
-<p><strong>Side note</strong> - Notice how I used <code>posterior_predict</code>, as opposed to <code>posterior_linpred</code>. The reason I did this is I want to account for the residual variance in my predictions. I’m interested in the uncertainty in the trend, at any given time point.</p>
 </div>
 <div id="estimating-derivatives" class="section level3">
 <h3>Estimating Derivatives</h3>
-<p>What if we’re also interested in knowing, what is the rate of change of a trend, and what areas show a signficant change in the rate of trends?</p>
+<p>What if we’re also interested in knowing, what is the rate of change of a trend, and what areas show a signficant change in the rate of trends? Sometimes these changes aren’t immediately obvious, and we’d like to quantify the differences in the rates of change and their associated uncertainty.</p>
 <p>As Dr. Simpson shows in his paper, we’ll use the method of finite differences. In a simple linear regression example, the rate of change is constant and that is the beta coefficient. However, for a non-linear trend, this rate of change, erm.. constantly changes.. Thus, we need to estimate the rate of change across the whole range of <code>x2</code>.</p>
 <p>And the fact that we have a posterior distribution to work with, calculating the uncertainty intervals of the derivatives is easy - peasy.</p>
 <p>Here we go -</p>
@@ -130,89 +138,18 @@ diff &lt;- (second_preds - first_preds) / epsilon
 mean_finite_diff  &lt;- apply(diff, MARGIN = 2, FUN = mean)
 lower_finite_diff &lt;- apply(diff, MARGIN = 2, FUN = quantile,prob = 0.025)
 upper_finite_diff &lt;- apply(diff, MARGIN = 2, FUN = quantile,prob = 0.975)</code></pre>
-<p>Now that we have our means in one hand, and the quantiles in the other, we can do the same thing we did for the trends, plot these and compare where the rates of change differ.</p>
+<p>Now that we have our means in one hand, and the quantiles in the other, we can do the same thing we did for the trends, plot these and compare where the rates of change differ.<br />
+We can see that factor <code>1</code> has a much higher rate of change as compared to the others, but this rate of change is slowing down while eventually coming out to be close to the other factors.</p>
 <pre class="r"><code>data.frame(mean_finite_diff) %&gt;%
   cbind(lower_finite_diff) %&gt;%
   cbind(upper_finite_diff) %&gt;%
   cbind(first) %&gt;%
   ggplot(.,aes(x2, mean_finite_diff, group = fac)) + geom_line(aes(color = fac))  + geom_ribbon(aes(ymin = lower_finite_diff, ymax = upper_finite_diff), alpha = 0.1) + labs(y = &quot;First Derivative&quot;, title = &quot;Estimated First Derivatives&quot;)</code></pre>
 <p><img src="/post/2019-08-24-estimating-smooth-trends-and-identifying-periods-of-change-using-bayesian-inference_files/figure-html/unnamed-chunk-10-1.png" width="672" /></p>
-<p>Why did I use <code>posterior_linpred</code> here, and ignore the sampling variance? Well, to be honest, I’m not a 100% sure what’s going on because when I use <code>posterior_predict</code>, the uncertanity intervals blow up.</p>
-<p>Not only that, they are <em>extremely</em> sensitive to the choice of <code>epsilon</code> - smaller it is, larger the uncertainty. I know <code>posterior_predict</code> incorporates the sampling variance, but I’m not sure why the intervals are so sensitive to the choice of <code>epsilon</code>. This isn’t the case with <code>posterior_linpred</code>.</p>
-<p>Below we’re using the same value of epsilon, but <code>posterior_predict</code></p>
-<pre class="r"><code>epsilon &lt;- 1e-6
-first &lt;- expand.grid(x2 = seq(0, 1, length = 4000),
-                     fac = c(&#39;1&#39;, &#39;2&#39;, &#39;3&#39;))
-
-## We simply shift the second grid by a small amount, and evaulate predictions there  
-second &lt;- first %&gt;%
-          mutate(x2 = x2 + epsilon)
-
-## get predictions
-first_preds &lt;-
-  posterior_predict(mod,
-                    newdata = first,
-                    summary = FALSE,)
-second_preds &lt;-
-  posterior_predict(mod,
-                    newdata = second,
-                    summary = FALSE)
-
-
-## Calcualte the differennce and divide by epsilon - this is analgous to the dx/dt 
-diff &lt;- (second_preds - first_preds) / epsilon
-
-
-## using the posterior samples, we calculate the mean and lower and upper quantiles
-mean_finite_diff  &lt;- apply(diff, MARGIN = 2, FUN = mean)
-lower_finite_diff &lt;- apply(diff, MARGIN = 2, FUN = quantile,prob = 0.025)
-upper_finite_diff &lt;- apply(diff, MARGIN = 2, FUN = quantile,prob = 0.975)
-
-data.frame(mean_finite_diff) %&gt;%
-  cbind(lower_finite_diff) %&gt;%
-  cbind(upper_finite_diff) %&gt;%
-  cbind(first) %&gt;%
-  ggplot(.,aes(x2, mean_finite_diff, group = fac)) + geom_line(aes(color = fac))  + geom_ribbon(aes(ymin = lower_finite_diff, ymax = upper_finite_diff), alpha = 0.1) + labs(y = &quot;First Derivatives&quot;)</code></pre>
-<p><img src="/post/2019-08-24-estimating-smooth-trends-and-identifying-periods-of-change-using-bayesian-inference_files/figure-html/unnamed-chunk-11-1.png" width="672" /></p>
-<p><strong>Larger epsilon</strong>
-Did the same thing with <code>epsilon=0.1</code></p>
-<pre class="r"><code>epsilon &lt;- 0.1
-first &lt;- expand.grid(x2 = seq(0, 1, length = 4000),
-                     fac = c(&#39;1&#39;, &#39;2&#39;, &#39;3&#39;))
-
-## We simply shift the second grid by a small amount, and evaulate predictions there  
-second &lt;- first %&gt;%
-          mutate(x2 = x2 + epsilon)
-
-## get predictions
-first_preds &lt;-
-  posterior_predict(mod,
-                    newdata = first,
-                    summary = FALSE,)
-second_preds &lt;-
-  posterior_predict(mod,
-                    newdata = second,
-                    summary = FALSE)
-
-
-## Calcualte the differennce and divide by epsilon - this is analgous to the dx/dt 
-diff &lt;- (second_preds - first_preds) / epsilon
-
-
-## using the posterior samples, we calculate the mean and lower and upper quantiles
-mean_finite_diff  &lt;- apply(diff, MARGIN = 2, FUN = mean)
-lower_finite_diff &lt;- apply(diff, MARGIN = 2, FUN = quantile,prob = 0.025)
-upper_finite_diff &lt;- apply(diff, MARGIN = 2, FUN = quantile,prob = 0.975)
-
-data.frame(mean_finite_diff) %&gt;%
-  cbind(lower_finite_diff) %&gt;%
-  cbind(upper_finite_diff) %&gt;%
-  cbind(first) %&gt;%
-  ggplot(.,aes(x2, mean_finite_diff, group = fac)) + geom_line(aes(color = fac))  + geom_ribbon(aes(ymin = lower_finite_diff, ymax = upper_finite_diff), alpha = 0.1) + labs(y = &quot;First Derivative&quot;)</code></pre>
-<p><img src="/post/2019-08-24-estimating-smooth-trends-and-identifying-periods-of-change-using-bayesian-inference_files/figure-html/unnamed-chunk-12-1.png" width="672" /></p>
-<p>What gives? For making inferences on the difference between groups at any given predictor value, I think <code>posterior_predict</code> is more meaningful - <em>I want to know the associate uncertainty at THAT particular timepoint/predictor value, as opposed to the expectation</em>. However, for the rate of change/first derivative, I’m interested in the <em>average</em> rate of change and the uncertainty associated with the average.</p>
-<p>This is a weak, weak argument I agree, and one of convenience. The way <code>mgcv</code> computes derivatives is by using the linear predictor(expectation) and the uncertainity around that and ignores the sampling variance.</p>
-<p>I would love if anyone had any thoughts on this and how to justify using <code>posterior_linpred</code> as opposed to <code>predict</code> when computing the first derivatives.</p>
-<p>It’s true you know, the more you dig into something, the more you realize how little you know of it! Thank you for reading!</p>
+</div>
+<div id="conclusion--" class="section level3">
+<h3>Conclusion -</h3>
+<p>Modeling linear relationships are great because not only do you see where they differ, the coefficients for each of the trends indicate how different their slope is. Doing so for non-linear models is not possible because the slope changes with every change in the predictor variable. This is where the method of finite differences comes into play allowing us to look at a large number of slopes at really really small intervals and assess where the changes happen.</p>
+<p>Made possible by the powerful and versatile libraries <code>mgcv</code> ands <code>brms</code>!</p>
 </div>
 </div>

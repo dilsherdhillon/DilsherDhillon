@@ -10,11 +10,11 @@ weight = 1
 # List your academic interests.
 [interests]
   interests = [
-    "Clinical Statistics",
-    "Machine Learning",
-    "Variable selection in clinical prediction models ",
-    "Longitudinal data analysis",
-    "Unsupervised learning"
+    "Applied Statistical Learning",
+    "Experimental Design",
+    "Bayesian Inference",
+    "Reproducible Research and Analysis",
+    "Longitudinal data analysis"
   ]
 
 # List your qualifications (such as academic degrees).
@@ -34,38 +34,19 @@ weight = 1
   year = 2010
  
 +++
+### Work    
+I work as a statistical consultant in the data science centre of excellence at Shell, Houston TX. Within the data science COE I'm part of a statistical consulting team that provides statistical support to researchers and engineers , mostly in the fuels and lubricants business of Shell. This includes planning and design of experiments, data management, statistical analysis and writing statistical reports for marketing claims.    
 
-### Biography
+In addition, I work with the machine learning team to support the statistical and data science needs of west Texas permian basin on-shore drilling operations.   
 
-I work as a statistician with Baylor College of Medicine. I work mostly with electronic medical record data collected in clinics across sub-saharan Africa and helping clinicians answer specific questions from these large longitudinal datasets. I also work with researchers in Baylor to help them get better insights into their experimental lab data.   
+### Skills   
+Tools and algorithms that I am most familiar with and frequently use include ANOVAs, regularized regression models, generalized additive models(GAMs), multilevel models , auto-regressive time series models,  boosting tree models, bayesian additive regression trees (BARTs).   I primarily use and prefer R and Stan for most of my work, with some python by virtue of working with a machine learning team that uses it.   
 
-Prior to being a full-time statistician, I worked on analyzing mass spectrometry data and developing sensitive blood-based diagnostics assays for early detection of cancer including  [lung](https://www.ncbi.nlm.nih.gov/pubmed/30003238) and [pancreatic](https://www.ncbi.nlm.nih.gov/pubmed/28376157).   
+I'm an advocate for reproducible research and generate all statistical analyis reports in Rmarkdown and for projects requring statistical analysis review, I encourage the use of docker containers to ensure reproducibility.  
 
+Outside of work my time is spent between reading books and case studies on bayesian modeling, crossfit and frequenting a local brewery in town.   
 
-### Applied Skills  
-
-
-* Multivariate Regression, 
-    + Regularized regression methods, tree-based regression techniques, time series regression, mixed             effects modeling
-    + Bayesian regression(*rstanarm, brms*), 
-    + Resampling and cross-validation techniques  
-    + Discriminant analysis, Unsupervised learning methods - hierarchical clustering, K-means clustering,         Principal Component Analysis  
-    
-
-* Design of clinical trials, survival analysis of censored data, analysis of longitudinal data, imputation techniques for missing data  
+Prior to being a statistician, I worked as a bench scientist developing sensitive blood-based diagnostics assays for early detection of cancer including  [lung](https://www.ncbi.nlm.nih.gov/pubmed/30003238) and [pancreatic](https://www.ncbi.nlm.nih.gov/pubmed/28376157) at MD Anderson Cancer Center.     
 
 
-* Develop fixed, random and mixed effects models to analyze experimental data  
-
-
-* Analysis of biological data using Bio-conductor, DNA sequence alignment, pre-processing and analyzing NGS data  
-
-
-* Develop machine learning workflows using *caret* and *Scikit-learn*  
-
-* Extensive experience with programming in R, Python and SAS  
-   + Data ‘tidying’ and management using *tidyverse*, *data.table*, *pandas* and *numpy* libraries in R           and Python o Visualization techniques using ggplot and seaborn  
-   + Parallel computing in R to execute programs for implementing computationally intensive procedures  
-   + Enabling reproducible analysis and documentation using R markdown and jupyter notebooks  
-   + Version control using github  
 

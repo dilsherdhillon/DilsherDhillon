@@ -1,0 +1,149 @@
+---
+title: "Using tidy verbs in data.table"
+author: "Dilsher Dhillon"
+date: '2020-01-01'
+output:
+  blogdown::html_page:
+    toc: true     
+---
+
+
+<div id="TOC">
+<ul>
+<li><a href="#introduction">Introduction</a></li>
+<li><a href="#results">Results</a></li>
+<li><a href="#code-for-simulation">Code for simulation</a></li>
+<li><a href="#conclusion">Conclusion</a></li>
+</ul>
+</div>
+
+<p>Hello 2020! I’m going to start off this new year with a post that I’ve been meaning to put up for a while. It has nothing to do with statistics, but very much to do with my other love, the language R and it’s data manipulation libraries <code>tidyr</code> and <code>data.table</code>.</p>
+<div id="introduction" class="section level2">
+<h2>Introduction</h2>
+<p>For most of my work, the tidyverse set of packages get me where I want to be with the added ease of syntax, readibility and all the good stuff. But every now and then I’ll encounter a situation where I have to fall back on those saved bookmarks with <code>data.table</code> tutorials.</p>
+<p>One of these was where I was dealing with ~ 20,000 groups with each group occuring ~15 times on an average. One of the measurements for these needed to be imputed by group i.e, one measurment was available per group, but this needed to be “filled” for the whole group. Yes, if you didn’t already guess it, <code>tidyr::fill()</code> is the way to go in a single line. This is exactly what I thought and set up my code and ran it.</p>
+<p><strong>My laptop ran for a whole day and it still hadn’t stopped running</strong>.</p>
+<p><strong>Enter data.table</strong></p>
+<p>I turned to the overlords of speed, the <code>data.table</code> library to possible speed it up, and in doing so learned that not only can you use pipes with data.tables, but also literally any function can be used within it! Using the <code>.SD</code> argument, you can pretty much use data.table in the same way as you would a tibble.</p>
+<p>I set up my code to run, expecting to come back a few hours laters to see if it was finished running, but to my disbelief, it was done within a matter of minutes! The SAME function applied to a <code>tibble</code> ran for a day, but when using a <code>data.table</code>, done within minutes?!</p>
+</div>
+<div id="results" class="section level2">
+<h2>Results</h2>
+<p>I had to confirm this finding wasn’t a fluke so I set out to run some simulations, and the results are, quite eye-opening. When the groups are in the 10s or the 100s, data.table performs marginally better, and that too a the millisecond level. No biggie - who even cares for a few milliseconds? But when the groups reach 5000, the difference is YUUUUUUGE - &gt; ~ 200 fold difference, at the level of seconds… 7 seconds for a <code>data.table</code> to do the same thing that took <code>tibble</code> 26 minutes.</p>
+<pre class="r"><code>tests &lt;- readRDS(here::here(&quot;static&quot;, &quot;files&quot;, &quot;tests_5000_groups.rds&quot;))   
+tests &lt;- set_names(tests, nm = c(&quot;10 groups&quot;, &quot;100 groups&quot;, &quot;1000 groups&quot;, &quot;2000 groups&quot;, &quot;5000 groups&quot;))
+
+purrr::map(tests, ~autoplot(.x))  </code></pre>
+<pre><code>## $`10 groups`</code></pre>
+<p><img src="/post/Using_tidy_verbs_datatable_files/figure-html/unnamed-chunk-2-1.png" width="672" /></p>
+<pre><code>## 
+## $`100 groups`</code></pre>
+<p><img src="/post/Using_tidy_verbs_datatable_files/figure-html/unnamed-chunk-2-2.png" width="672" /></p>
+<pre><code>## 
+## $`1000 groups`</code></pre>
+<p><img src="/post/Using_tidy_verbs_datatable_files/figure-html/unnamed-chunk-2-3.png" width="672" /></p>
+<pre><code>## 
+## $`2000 groups`</code></pre>
+<p><img src="/post/Using_tidy_verbs_datatable_files/figure-html/unnamed-chunk-2-4.png" width="672" /></p>
+<pre><code>## 
+## $`5000 groups`</code></pre>
+<p><img src="/post/Using_tidy_verbs_datatable_files/figure-html/unnamed-chunk-2-5.png" width="672" /></p>
+<pre class="r"><code>tests</code></pre>
+<pre><code>## $`10 groups`
+## Unit: milliseconds
+##        expr      min       lq     mean   median       uq      max neval
+##      tibble 37.49481 41.98588 46.58438 46.50469 49.90171 59.94450    10
+##  data.table 20.22548 20.42626 22.69165 21.65140 22.78060 28.70793    10
+##  cld
+##    b
+##   a 
+## 
+## $`100 groups`
+## Unit: milliseconds
+##        expr      min       lq     mean   median       uq      max neval
+##      tibble 184.7798 187.5413 190.2715 190.1950 190.4937 198.0482    10
+##  data.table 143.8182 147.0359 163.0706 150.7431 153.1045 277.2147    10
+##  cld
+##    b
+##   a 
+## 
+## $`1000 groups`
+## Unit: seconds
+##        expr      min       lq     mean   median       uq      max neval
+##      tibble 1.687751 1.696000 1.726084 1.711365 1.735190 1.859891    10
+##  data.table 1.406881 1.435975 1.471199 1.449469 1.483755 1.587060    10
+##  cld
+##    b
+##   a 
+## 
+## $`2000 groups`
+## Unit: seconds
+##        expr      min       lq     mean   median       uq      max neval
+##      tibble 3.317388 3.374256 3.426579 3.389765 3.487578 3.563575    10
+##  data.table 2.799702 2.814149 2.838442 2.826381 2.856391 2.898111    10
+##  cld
+##    b
+##   a 
+## 
+## $`5000 groups`
+## Unit: seconds
+##        expr         min          lq        mean      median          uq
+##      tibble 1447.198957 1500.951692 1640.659575 1559.728039 1705.000048
+##  data.table    6.970596    7.015401    7.129674    7.074186    7.150923
+##          max neval cld
+##  2039.625297    10   b
+##     7.563135    10  a</code></pre>
+<p>That’s a massive difference that can’t be ignored. When this number goes up to 10000 my laptop ran for hours at a stretch and I had to pull the plug on it because I had no idea how long it would take.</p>
+</div>
+<div id="code-for-simulation" class="section level2">
+<h2>Code for simulation</h2>
+<p>Below is the simualtion I ran for the results above. I create a function that can create the specified number of groups and an associated measuremnt for each occurence of the group. The proportion of missing data in the measured variable can also be specified and randomly assigns missing values to the measurment.</p>
+<p>The benchmarking for the <code>fill</code> function happens in the same function itself and it returns a data.frame with the benchmark results.</p>
+<pre class="r"><code>library(tidyverse)  
+library(microbenchmark)  
+library(data.table)  
+
+
+fill_benchmarking &lt;- function(n = 1e5, groups = 1e2, 
+                              missing_proportion = 0.3, times = 1) {
+   
+  missing_var &lt;- rnorm(n, 10, 5)  
+  ## this creates the proportion of missing data  
+  index &lt;- rbinom(n, 1, missing_proportion)  
+  miising_var &lt;- cbind(missing_var, index)
+  ## create missing data  
+  missing_var &lt;- ifelse(index == 1, NA, missing_var)  
+ 
+  ## create a grouping variable  
+  grouping_var &lt;- as.character(rep(1:groups, each = n/groups))
+ 
+  df &lt;- tibble(missing_var = missing_var, grouping_var = grouping_var)  
+ 
+  ## this performs the benchmarking. The number of iterations can be specified by 
+  ## the argument times   
+  bm &lt;- microbenchmark::microbenchmark(tibble =
+                               
+                                  ## Use fill() on a tibble         
+                                  df &lt;- df %&gt;%
+                                    group_by(grouping_var) %&gt;%
+                                    fill(., missing_var, .direction = &quot;up&quot;) %&gt;%
+                                    fill(., missing_var, .direction = &quot;down&quot;)
+                                   
+                                ,
+                                ## Use fill() on a data.table   
+                                  data.table =
+                                     dt &lt;- df %&gt;%
+                                            setDT(.) %&gt;%
+                                           .[, fill(.SD, missing_var, .direction = &quot;up&quot;), by = &quot;grouping_var&quot;] %&gt;%
+                                           .[, fill(.SD, missing_var, .direction = &quot;down&quot;), by = &quot;grouping_var&quot;]
+                              ,
+                              times  = times)}</code></pre>
+<p>We iterate this function for 10 times over varying number of groups</p>
+<pre class="r"><code>tests &lt;- purrr::map(c(10,100,1000, 2000, 5000), ~
+                fill_benchmarking(groups = .x, times = 10))   
+saveRDS(tests, here::here(&quot;static&quot;, &quot;files&quot;, &quot;tests_5000_groups.rds&quot;))  </code></pre>
+</div>
+<div id="conclusion" class="section level2">
+<h2>Conclusion</h2>
+<p>Going through this excercise taught me how to use <code>tidyr</code> verbs in a <code>data.table</code>, AND use pipes to keep the syntax clearer and distinct. But also, contrary to what I thought before, that a few milliseconds worth of speed increase isn’t important enough for me to spend time learning <code>data.table</code>, it really is a powerful library which provides unknowingly massive speed bumps as compared to a <code>tibble</code>, not just in the seconds but in minutes, which could be a gamechanger if you’re deploying real time applications.</p>
+</div>

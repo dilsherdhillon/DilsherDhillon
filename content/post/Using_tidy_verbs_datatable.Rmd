@@ -1,0 +1,122 @@
+---
+title: "Using tidy verbs in data.table"
+author: "Dilsher Dhillon"
+date: '2020-01-01'
+output:
+  blogdown::html_page:
+    toc: true     
+---
+
+Hello 2020!  I'm going to start off this new year with a post that I've been meaning to put up for a while.  It has nothing to do with statistics, but very much to do with my other love, the language R and it's data manipulation libraries `tidyr` and `data.table`.   
+
+
+## Introduction  
+
+For most of my work, the tidyverse set of packages get me where I want to be with the added ease of syntax, readibility and all the good stuff.  But every now and then I'll encounter a situation where I have to fall back on those saved bookmarks with `data.table` tutorials.   
+
+One of these was where I was dealing with ~ 20,000 groups with each group occuring ~15 times on an average. One of the measurements for these needed to be imputed by group i.e, one measurment was available per group, but this needed to be "filled" for the whole group.   Yes, if you didn't already guess it, `tidyr::fill()` is the way to go in a single line.   This is exactly what I thought and set up my code and ran it.  
+
+**My laptop ran for a whole day and it still hadn't stopped running**.  
+
+**Enter data.table**        
+
+I turned to the overlords of speed, the `data.table` library to possible speed it up, and in doing so learned that not only can you use pipes with data.tables, but also literally any function can be used within it!   Using the `.SD` argument, you can pretty much use data.table in the same way as you would a tibble.   
+
+
+I set up my code to run, expecting to come back a few hours laters to see if it was finished running, but to my disbelief, it was done within a matter of minutes! The SAME function applied to a `tibble` ran for a day, but when using a `data.table`, done within minutes?!   
+
+
+## Results  
+
+
+I had to confirm this finding wasn't a fluke so I set out to run some simulations, and the results are, quite eye-opening. When the groups are in the 10s or the 100s, data.table performs marginally better, and that too a the millisecond level. No biggie - who even cares for a few milliseconds?  But when the groups reach 5000, the difference is YUUUUUUGE - > ~ 200 fold difference, at the level of seconds...   7 seconds for a `data.table` to do the same thing that took `tibble` 26 minutes. 
+
+```{r include=FALSE}
+library(tidyverse)  
+library(microbenchmark)  
+library(data.table)  
+```
+
+
+```{r message=FALSE, warning=FALSE}
+tests <- readRDS(here::here("static", "files", "tests_5000_groups.rds"))   
+tests <- set_names(tests, nm = c("10 groups", "100 groups", "1000 groups", "2000 groups", "5000 groups"))
+
+purrr::map(tests, ~autoplot(.x))  
+
+tests
+```
+
+
+
+That's a massive difference that can't be ignored. When this number goes up to 10000 my laptop ran for hours at a stretch and I had to pull the plug on it because I had no idea how long it would take.   
+
+## Code for simulation       
+
+Below is the simualtion I ran for the results above.  I create a function that can create the specified number of groups and an associated measuremnt for each occurence of the group.  The proportion of missing data in the measured variable can also be specified and randomly assigns missing values to the measurment.  
+
+The benchmarking for the `fill` function happens in the same function itself and it returns a data.frame with the benchmark results.  
+
+```{r}
+library(tidyverse)  
+library(microbenchmark)  
+library(data.table)  
+
+
+fill_benchmarking <- function(n = 1e5, groups = 1e2, 
+                              missing_proportion = 0.3, times = 1) {
+   
+  missing_var <- rnorm(n, 10, 5)  
+  ## this creates the proportion of missing data  
+  index <- rbinom(n, 1, missing_proportion)  
+  miising_var <- cbind(missing_var, index)
+  ## create missing data  
+  missing_var <- ifelse(index == 1, NA, missing_var)  
+ 
+  ## create a grouping variable  
+  grouping_var <- as.character(rep(1:groups, each = n/groups))
+ 
+  df <- tibble(missing_var = missing_var, grouping_var = grouping_var)  
+ 
+  ## this performs the benchmarking. The number of iterations can be specified by 
+  ## the argument times   
+  bm <- microbenchmark::microbenchmark(tibble =
+                               
+                                  ## Use fill() on a tibble         
+                                  df <- df %>%
+                                    group_by(grouping_var) %>%
+                                    fill(., missing_var, .direction = "up") %>%
+                                    fill(., missing_var, .direction = "down")
+                                   
+                                ,
+                                ## Use fill() on a data.table   
+                                  data.table =
+                                     dt <- df %>%
+                                            setDT(.) %>%
+                                           .[, fill(.SD, missing_var, .direction = "up"), by = "grouping_var"] %>%
+                                           .[, fill(.SD, missing_var, .direction = "down"), by = "grouping_var"]
+                              ,
+                              times  = times)}
+
+```
+
+We iterate this function for 10 times over varying number of groups   
+
+```{r eval=FALSE, include=TRUE}  
+tests <- purrr::map(c(10,100,1000, 2000, 5000), ~
+                fill_benchmarking(groups = .x, times = 10))   
+saveRDS(tests, here::here("static", "files", "tests_5000_groups.rds"))  
+```
+
+
+
+## Conclusion  
+
+Going through this excercise taught me how to use `tidyr` verbs in a `data.table`, AND use pipes to keep the syntax clearer and distinct.  But also, contrary to what I thought before, that a few milliseconds worth of speed increase isn't important enough for me to spend time learning `data.table`, it really is a powerful library which provides unknowingly massive speed bumps as compared to a `tibble`, not just in the seconds but in minutes, which could be a gamechanger if you're deploying real time applications.    
+
+
+
+
+
+
+
