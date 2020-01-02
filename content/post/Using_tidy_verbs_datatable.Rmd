@@ -115,6 +115,9 @@ saveRDS(tests, here::here("static", "files", "tests_5000_groups.rds"))
 Going through this excercise taught me how to use `tidyr` verbs in a `data.table`, AND use pipes to keep the syntax clearer and distinct.  But also, contrary to what I thought before, that a few milliseconds worth of speed increase isn't important enough for me to spend time learning `data.table`, it really is a powerful library which provides unknowingly massive speed bumps as compared to a `tibble`, not just in the seconds but in minutes, which could be a gamechanger if you're deploying real time applications.    
 
 
+```{r}
+sessioninfo::session_info()
+```
 
 
 
