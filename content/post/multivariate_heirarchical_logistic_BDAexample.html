@@ -1,0 +1,549 @@
+---
+title: "Hierarchical Multivariate Logistic Regression"
+subtitle: ""  
+author: "Dilsher Dhillon"
+date: "2020-02-02"
+output:
+  blogdown::html_page:
+    toc: true
+---
+
+
+<div id="TOC">
+<ul>
+<li><a href="#introduction">Introduction</a><ul>
+<li><a href="#problem-set-up">Problem Set-up</a></li>
+</ul></li>
+<li><a href="#data">Data</a></li>
+<li><a href="#hierarchical-model">Hierarchical Model</a><ul>
+<li><a href="#prior-predictive-simulation">Prior Predictive Simulation</a></li>
+<li><a href="#posterior-distribution">Posterior Distribution</a></li>
+<li><a href="#shrinkage">Shrinkage</a></li>
+</ul></li>
+<li><a href="#conclusion">Conclusion</a></li>
+</ul>
+</div>
+
+<div id="introduction" class="section level2">
+<h2>Introduction</h2>
+<p>The original motivation for this post was to recreate an analysis in BDA (chapter 8), but as I started working through it, I realized it is an opportunity to write about several interesting concepts within the same framework. The overarching theme of this post covers<br />
+1. How to set up a multivariate logistic regression (<strong>not</strong> a multinomial or multivariable)<br />
+1. How to set priors for Generalized Linear Models<br />
+3. Hierarchical Models and Shrinkage of parameters</p>
+<p><strong>What will you learn from this post?</strong><br />
+My goal is that by the end of this post, you’ll be able to<br />
+1. Run prior predictive simulations for logistic regression models and hopefully I can convince you why using default priors or uninformative priors is generally a bad idea.<br />
+2. Visualize shrinkage in the context of hierarchical models.</p>
+<div id="problem-set-up" class="section level3">
+<h3>Problem Set-up</h3>
+<p>The data set for this problem comes from the chapter on <em>Modeling for accounting in data collection process</em>, where Gelman et al talk about accounting the data collection process into the model set-up. A <em>stratified random sampling</em> opinion poll was conducted and data collected from 16 <em>strata</em> across the country.</p>
+<p>There are two parameters of interest for this analysis -</p>
+<ol style="list-style-type: decimal">
+<li>Proportion of people voting bush (<em>of the people who had an opinion</em>) - <span class="math display">\[  \alpha \ _1j  \]</span><br />
+</li>
+<li>Proportion of people that gave an opinion - <span class="math display">\[  \alpha \ _2j  \]</span></li>
+</ol>
+<p>Both of these can be derived from the above data. In addition, we know the total number of people samples (<code>n = 1447</code>), so we use the <code>sample_proportion</code> to calculate how many people were sampled in each strata. (we’ll later use this to convert the data into a long form format)</p>
+<div class="figure">
+<img src="/img/bda_survey_table.PNG" alt="Sample Survey" />
+<p class="caption">Sample Survey</p>
+</div>
+<pre class="r"><code>library(tidyverse)
+library(brms)
+library(tidybayes)</code></pre>
+</div>
+</div>
+<div id="data" class="section level2">
+<h2>Data</h2>
+<pre class="r"><code>df_raw &lt;- tibble::tibble(stratum = c(&quot;northeast, I&quot;, &quot;northeast,II&quot;,&quot;northeast,III&quot;,&quot;northeast,IV&quot;,
+             &quot;midwest,I&quot;,&quot;midwest,II&quot;,&quot;midwest,III&quot;,&quot;midwest,IV&quot;,
+             &quot;south,I&quot;,&quot;south,II&quot;,&quot;south,III&quot;,&quot;south,IV&quot;,
+             &quot;west,I&quot;,&quot;west,II&quot;,&quot;west,III&quot;,&quot;west,IV&quot;), 
+                     proportion_bush =  c(0.30,0.5,0.47,0.46,0.40,0.45,0.51,0.55,0.57,0.47,0.52,0.56,0.50,
+                      0.53,0.54,0.53),
+                     proportion_dukakis = c(0.62,0.48,0.41,0.52,0.49,0.45,0.39,0.34,0.29,0.41,0.40,
+                        0.35,0.47,0.35,0.37,0.36),
+                     proportion_no_opinion = c(0.08,0.02,0.12,0.02,0.11,0.10,0.10,0.11,0.14,0.12,
+                            0.08,0.09,0.03,0.12,0.09,0.08), 
+                     sample_proportion = c(0.032,0.032,0.115,0.048,0.032,0.065,0.080,0.100,0.015,0.066,0.068,
+                       0.126,0.023,0.053,0.086,0.057))</code></pre>
+<p><strong>Create the two parameters of interest</strong></p>
+<pre class="r"><code>df &lt;- df_raw %&gt;%
+  dplyr::mutate(a_1 = proportion_bush/(proportion_bush + proportion_dukakis)) %&gt;%
+  dplyr::mutate(a_2 = 1 - proportion_no_opinion) %&gt;%
+  dplyr::mutate(sampled_nj = round(sample_proportion*1447)) 
+
+df &lt;- df %&gt;%
+  mutate(a_1_count = round(a_1*sampled_nj),
+         a_2_count = round(a_2*sampled_nj))  
+df %&gt;%
+  knitr::kable()</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="left">stratum</th>
+<th align="right">proportion_bush</th>
+<th align="right">proportion_dukakis</th>
+<th align="right">proportion_no_opinion</th>
+<th align="right">sample_proportion</th>
+<th align="right">a_1</th>
+<th align="right">a_2</th>
+<th align="right">sampled_nj</th>
+<th align="right">a_1_count</th>
+<th align="right">a_2_count</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">northeast, I</td>
+<td align="right">0.30</td>
+<td align="right">0.62</td>
+<td align="right">0.08</td>
+<td align="right">0.032</td>
+<td align="right">0.3260870</td>
+<td align="right">0.92</td>
+<td align="right">46</td>
+<td align="right">15</td>
+<td align="right">42</td>
+</tr>
+<tr class="even">
+<td align="left">northeast,II</td>
+<td align="right">0.50</td>
+<td align="right">0.48</td>
+<td align="right">0.02</td>
+<td align="right">0.032</td>
+<td align="right">0.5102041</td>
+<td align="right">0.98</td>
+<td align="right">46</td>
+<td align="right">23</td>
+<td align="right">45</td>
+</tr>
+<tr class="odd">
+<td align="left">northeast,III</td>
+<td align="right">0.47</td>
+<td align="right">0.41</td>
+<td align="right">0.12</td>
+<td align="right">0.115</td>
+<td align="right">0.5340909</td>
+<td align="right">0.88</td>
+<td align="right">166</td>
+<td align="right">89</td>
+<td align="right">146</td>
+</tr>
+<tr class="even">
+<td align="left">northeast,IV</td>
+<td align="right">0.46</td>
+<td align="right">0.52</td>
+<td align="right">0.02</td>
+<td align="right">0.048</td>
+<td align="right">0.4693878</td>
+<td align="right">0.98</td>
+<td align="right">69</td>
+<td align="right">32</td>
+<td align="right">68</td>
+</tr>
+<tr class="odd">
+<td align="left">midwest,I</td>
+<td align="right">0.40</td>
+<td align="right">0.49</td>
+<td align="right">0.11</td>
+<td align="right">0.032</td>
+<td align="right">0.4494382</td>
+<td align="right">0.89</td>
+<td align="right">46</td>
+<td align="right">21</td>
+<td align="right">41</td>
+</tr>
+<tr class="even">
+<td align="left">midwest,II</td>
+<td align="right">0.45</td>
+<td align="right">0.45</td>
+<td align="right">0.10</td>
+<td align="right">0.065</td>
+<td align="right">0.5000000</td>
+<td align="right">0.90</td>
+<td align="right">94</td>
+<td align="right">47</td>
+<td align="right">85</td>
+</tr>
+<tr class="odd">
+<td align="left">midwest,III</td>
+<td align="right">0.51</td>
+<td align="right">0.39</td>
+<td align="right">0.10</td>
+<td align="right">0.080</td>
+<td align="right">0.5666667</td>
+<td align="right">0.90</td>
+<td align="right">116</td>
+<td align="right">66</td>
+<td align="right">104</td>
+</tr>
+<tr class="even">
+<td align="left">midwest,IV</td>
+<td align="right">0.55</td>
+<td align="right">0.34</td>
+<td align="right">0.11</td>
+<td align="right">0.100</td>
+<td align="right">0.6179775</td>
+<td align="right">0.89</td>
+<td align="right">145</td>
+<td align="right">90</td>
+<td align="right">129</td>
+</tr>
+<tr class="odd">
+<td align="left">south,I</td>
+<td align="right">0.57</td>
+<td align="right">0.29</td>
+<td align="right">0.14</td>
+<td align="right">0.015</td>
+<td align="right">0.6627907</td>
+<td align="right">0.86</td>
+<td align="right">22</td>
+<td align="right">15</td>
+<td align="right">19</td>
+</tr>
+<tr class="even">
+<td align="left">south,II</td>
+<td align="right">0.47</td>
+<td align="right">0.41</td>
+<td align="right">0.12</td>
+<td align="right">0.066</td>
+<td align="right">0.5340909</td>
+<td align="right">0.88</td>
+<td align="right">96</td>
+<td align="right">51</td>
+<td align="right">84</td>
+</tr>
+<tr class="odd">
+<td align="left">south,III</td>
+<td align="right">0.52</td>
+<td align="right">0.40</td>
+<td align="right">0.08</td>
+<td align="right">0.068</td>
+<td align="right">0.5652174</td>
+<td align="right">0.92</td>
+<td align="right">98</td>
+<td align="right">55</td>
+<td align="right">90</td>
+</tr>
+<tr class="even">
+<td align="left">south,IV</td>
+<td align="right">0.56</td>
+<td align="right">0.35</td>
+<td align="right">0.09</td>
+<td align="right">0.126</td>
+<td align="right">0.6153846</td>
+<td align="right">0.91</td>
+<td align="right">182</td>
+<td align="right">112</td>
+<td align="right">166</td>
+</tr>
+<tr class="odd">
+<td align="left">west,I</td>
+<td align="right">0.50</td>
+<td align="right">0.47</td>
+<td align="right">0.03</td>
+<td align="right">0.023</td>
+<td align="right">0.5154639</td>
+<td align="right">0.97</td>
+<td align="right">33</td>
+<td align="right">17</td>
+<td align="right">32</td>
+</tr>
+<tr class="even">
+<td align="left">west,II</td>
+<td align="right">0.53</td>
+<td align="right">0.35</td>
+<td align="right">0.12</td>
+<td align="right">0.053</td>
+<td align="right">0.6022727</td>
+<td align="right">0.88</td>
+<td align="right">77</td>
+<td align="right">46</td>
+<td align="right">68</td>
+</tr>
+<tr class="odd">
+<td align="left">west,III</td>
+<td align="right">0.54</td>
+<td align="right">0.37</td>
+<td align="right">0.09</td>
+<td align="right">0.086</td>
+<td align="right">0.5934066</td>
+<td align="right">0.91</td>
+<td align="right">124</td>
+<td align="right">74</td>
+<td align="right">113</td>
+</tr>
+<tr class="even">
+<td align="left">west,IV</td>
+<td align="right">0.53</td>
+<td align="right">0.36</td>
+<td align="right">0.08</td>
+<td align="right">0.057</td>
+<td align="right">0.5955056</td>
+<td align="right">0.92</td>
+<td align="right">82</td>
+<td align="right">49</td>
+<td align="right">75</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Transform to long form</strong><br />
+Let’s transform this into a long form data set, where responses are classified as <code>0</code> or <code>1</code>.</p>
+<pre class="r"><code>## The following code chunk makes use of purrr and list columns to generate 0s and 1s  
+## The map2 takes in as vectors two things - the sampled people in each strata and 
+## the proportion of people for each parameter of interest   
+
+df_sub &lt;- df %&gt;%
+  select(stratum, sampled_nj, a_1_count, a_2_count) %&gt;%
+  mutate(strata = map2(as_vector(.[&#39;stratum&#39;]), 1:16, 
+                       ~ c(rep(.x, times = df[.y, &#39;sampled_nj&#39;])))) %&gt;%
+  mutate(a_1_binary = map2(as_vector(.[&#39;sampled_nj&#39;]),
+                              as_vector(.[&#39;a_1_count&#39;]),
+                              ~ c(rep(0, times = .x - .y), rep(1, times = .y)))) %&gt;%
+  mutate(a_2_binary = map2(as_vector(.[&#39;sampled_nj&#39;]),
+                              as_vector(.[&#39;a_2_count&#39;]),
+                              ~ c(rep(0, times = .x - .y), rep(1, times = .y))))
+
+## This just unnests the list columns   
+
+df_long &lt;- df_sub %&gt;%
+  select(strata, a_1_binary, a_2_binary) %&gt;%
+  unnest(cols = c(strata, a_1_binary, a_2_binary))
+
+## See what the data looks like   
+
+df_long %&gt;%
+  sample_n(10) %&gt;%
+  knitr::kable()</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="left">strata</th>
+<th align="right">a_1_binary</th>
+<th align="right">a_2_binary</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">northeast,III</td>
+<td align="right">0</td>
+<td align="right">0</td>
+</tr>
+<tr class="even">
+<td align="left">northeast, I</td>
+<td align="right">0</td>
+<td align="right">1</td>
+</tr>
+<tr class="odd">
+<td align="left">south,IV</td>
+<td align="right">1</td>
+<td align="right">1</td>
+</tr>
+<tr class="even">
+<td align="left">south,II</td>
+<td align="right">1</td>
+<td align="right">1</td>
+</tr>
+<tr class="odd">
+<td align="left">west,II</td>
+<td align="right">0</td>
+<td align="right">0</td>
+</tr>
+<tr class="even">
+<td align="left">south,IV</td>
+<td align="right">1</td>
+<td align="right">1</td>
+</tr>
+<tr class="odd">
+<td align="left">south,III</td>
+<td align="right">1</td>
+<td align="right">1</td>
+</tr>
+<tr class="even">
+<td align="left">midwest,I</td>
+<td align="right">0</td>
+<td align="right">1</td>
+</tr>
+<tr class="odd">
+<td align="left">south,III</td>
+<td align="right">0</td>
+<td align="right">0</td>
+</tr>
+<tr class="even">
+<td align="left">midwest,III</td>
+<td align="right">0</td>
+<td align="right">1</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="hierarchical-model" class="section level2">
+<h2>Hierarchical Model</h2>
+<p>Now that we have our data set up the way we’d like, we move on to modeling it. The natural choice for this is to model it as a hierarchical model - each strata is assumed to be exchangeable. For more on Hierarchical models and the set up, Chapter 5 in BDA is an excellent resources to know the guts of how these models work. Instead of modeling each strata as a fixed effect, we model these strata to come from the same population distribution. The estimate for each strata <em>learns</em> information from the other strata too.</p>
+<div id="prior-predictive-simulation" class="section level3">
+<h3>Prior Predictive Simulation</h3>
+<p>Generalized Linear Models are interaction models even if you haven’t specified any interactions. Priors that may make sense on the logit scale don’t always make sense on the probability scale. <code>brms</code> by default uses <code>student_t(3, 0, 10)</code> priors for the population level effects in hierarchical models. These are called “weakly informative priors” and more often than not help with efficient sampling of the posterior space.<br />
+Even with small amount data, the likelihood would take over and these “weakly informative priors” won’t affect our inferences, but as you start fitting more complex models, putting sensible informative priors on your parameters is more likely to lead to better sampling.</p>
+<p>Here we’ll look at what happens if we simulate data from the default priors and have a look at the plausible outcome space <em>before observing the data</em></p>
+<pre class="r"><code>m1.prior &lt;- fit1 &lt;- brm(mvbind(a_1_binary, a_2_binary) ~ (1|p|strata), data = df_long, 
+                  family = bernoulli, sample_prior = &quot;only&quot;, 
+                  chains = 4, cores = 2 ) 
+saveRDS(m1.prior, here::here(&quot;static&quot;, &quot;files&quot;, &quot;m1_prior.rds&quot;)) </code></pre>
+<p><strong>Before observing the data, what is our prior belief about people voting for bush on average across the whole country?</strong></p>
+<p>WOWZA! The default student_t(3, 0, 10) priors puts almost all mass in either extremes, which says, we either expect a large majority to vote for bush or a large majority not to vote for bush. That seems like a pretty unreasonable prior belief to keep.</p>
+<p>One of the criticisms that people have of bayesian statistics is that it is “subjective” and an often touted counter point is, to just use non-informative priors. Below is a classic example of why using non-informative priors does more harm than good.</p>
+<pre class="r"><code>posterior_samples(m1.prior) %&gt;%
+  select(1) %&gt;%
+  mutate(prior_bush = inv_logit_scaled(b_a1binary_Intercept)) %&gt;%
+  ggplot(.,aes(prior_bush)) + geom_density() + 
+  labs(title = &quot;Prior Probability of Voting for Bush&quot;, 
+       x = &quot;Probability&quot;,y = &quot;Density&quot;)</code></pre>
+<p><img src="/post/multivariate_heirarchical_logistic_BDAexample_files/figure-html/unnamed-chunk-8-1.png" width="672" /></p>
+<p>We could do a similar prior simulation for each region, and unsurprisingly, they have a similar distribution -</p>
+<pre class="r"><code>tidybayes::add_linpred_draws(newdata = df_long[1, &#39;strata&#39;], m1.prior) %&gt;%
+  filter(.category == &quot;a1binary&quot;) %&gt;%
+  ggplot(.,aes(.value)) + geom_density()  </code></pre>
+<p><img src="/post/multivariate_heirarchical_logistic_BDAexample_files/figure-html/unnamed-chunk-9-1.png" width="672" /></p>
+<p><strong>Correlation</strong> - Before observing the data, what is our prior belief about the correlation between voting bush and having an opinion?</p>
+<p>It’s quite uniformly distributed.</p>
+<pre class="r"><code>posterior_samples(m1.prior) %&gt;%
+  select(cor_strata__a1binary_Intercept__a2binary_Intercept) %&gt;%
+  ggplot(.,aes(cor_strata__a1binary_Intercept__a2binary_Intercept)) + 
+  geom_density() </code></pre>
+<p><img src="/post/multivariate_heirarchical_logistic_BDAexample_files/figure-html/unnamed-chunk-10-1.png" width="672" /></p>
+<div id="regularizing-priors" class="section level4">
+<h4>Regularizing Priors</h4>
+<p>Regularize the priors some and simulate the prior predictive distribution</p>
+<pre class="r"><code>m2.prior &lt;- brm(mvbind(a_1_binary, a_2_binary) ~ (1|p|strata), data = df_long, 
+                  family = bernoulli, sample_prior = &quot;only&quot;, 
+                  chains = 4, cores = 2, 
+                  prior = c(prior(student_t(3, 0, 1), class = sd, resp = a1binary), 
+                            prior(student_t(3, 0, 1), class = sd, resp = a2binary),
+                  prior(student_t(3, 0, 1), class = Intercept),
+                  prior(lkj(2), class = cor))) 
+saveRDS(m2.prior, here::here(&quot;static&quot;, &quot;files&quot;, &quot;m2_prior.rds&quot;)) </code></pre>
+<p><strong>Prior probability</strong></p>
+<p>These prior distributions look much more reasonable - the <em>average</em> probability is centered at 0.5 and puts equal mass both sides. In addition, the probability of voting in the Northeast, I region is uniformly distributed - we may want to tighten those priors a bit more. Let’s do that in the next step.</p>
+<p>Also, the distribution of correlation is much more reasonable - we don’t’ expect very strong correlations i.e it isn’t our belief that a high proportion of people having an opinion will also end up voting for bush or vice versa.</p>
+<pre class="r"><code>posterior_samples(m2.prior) %&gt;%
+  select(1) %&gt;%
+  mutate(prior_bush = inv_logit_scaled(b_a1binary_Intercept)) %&gt;%
+  ggplot(.,aes(prior_bush)) + geom_density() + labs(title = &quot;Prior Probability of Voting for Bush&quot;, 
+                                                    x = &quot;Probability&quot;,
+                                                    y = &quot;Density&quot;)</code></pre>
+<p><img src="/post/multivariate_heirarchical_logistic_BDAexample_files/figure-html/unnamed-chunk-13-1.png" width="672" /></p>
+<pre class="r"><code>tidybayes::add_linpred_draws(newdata = df_long[1, &#39;strata&#39;], m2.prior) %&gt;%
+  filter(.category == &quot;a1binary&quot;) %&gt;%
+  ggplot(.,aes(.value)) + geom_density() + labs(title = &quot;Probability of Voting Bush in Northeast, I&quot;)  </code></pre>
+<p><img src="/post/multivariate_heirarchical_logistic_BDAexample_files/figure-html/unnamed-chunk-13-2.png" width="672" /></p>
+<pre class="r"><code>posterior_samples(m2.prior) %&gt;%
+  select(cor_strata__a1binary_Intercept__a2binary_Intercept) %&gt;%
+  ggplot(.,aes(cor_strata__a1binary_Intercept__a2binary_Intercept)) + 
+  geom_density() + labs(title = &quot;Prior Distribution of Correlation&quot;) </code></pre>
+<p><img src="/post/multivariate_heirarchical_logistic_BDAexample_files/figure-html/unnamed-chunk-13-3.png" width="672" /></p>
+<p><strong>Even More Regularizing Priors for Regions</strong></p>
+<pre class="r"><code>m3.prior &lt;- fit1 &lt;- brm(mvbind(a_1_binary, a_2_binary) ~ (1|p|strata), data = df_long, 
+                  family = bernoulli, sample_prior = &quot;only&quot;, 
+                  chains = 4, cores = 2, 
+                  prior = c(prior(student_t(3, 0, 0.5), class = sd, resp = a1binary), 
+                            prior(student_t(3, 0, 0.5), class = sd, resp = a2binary),
+                  prior(student_t(3, 0, 1), class = Intercept),
+                  prior(lkj(2), class = cor))) 
+saveRDS(m3.prior, here::here(&quot;static&quot;, &quot;files&quot;, &quot;m3_prior.rds&quot;)) </code></pre>
+<p><strong>Prior probability</strong></p>
+<pre class="r"><code>posterior_samples(m3.prior) %&gt;%
+  select(1) %&gt;%
+  mutate(prior_bush = inv_logit_scaled(b_a1binary_Intercept)) %&gt;%
+  ggplot(.,aes(prior_bush)) + geom_density() + 
+  labs(title = &quot;Prior Probability of Voting for Bush&quot;, 
+       x = &quot;Probability&quot;, y = &quot;Density&quot;)</code></pre>
+<p><img src="/post/multivariate_heirarchical_logistic_BDAexample_files/figure-html/unnamed-chunk-16-1.png" width="672" /></p>
+<pre class="r"><code>tidybayes::add_linpred_draws(newdata = df_long[1, &#39;strata&#39;], m3.prior) %&gt;%
+  filter(.category == &quot;a1binary&quot;) %&gt;%
+  ggplot(.,aes(.value)) + geom_density() + 
+  labs(title = &quot;Probability of Voting Bush in Northeast, I&quot;)</code></pre>
+<p><img src="/post/multivariate_heirarchical_logistic_BDAexample_files/figure-html/unnamed-chunk-16-2.png" width="672" /></p>
+</div>
+<div id="separate-priors" class="section level4">
+<h4>Separate Priors</h4>
+<p>Now say for instance, we don’t have prior beliefs on proportion of people voting for bush, but we do have an idea of whether or not people will give an opinion or not. Recall, the <code>a_2_binary</code> is the proportion of people who gave an opinion. It is unlikely that a large proportion of people will NOT give an opinion - political science majors would be much better suited to answer this question, but I’ll go out on a limp and say that it is much more likely that more than 50 % of the population will give an opinion - so I’d want a prior that puts much more weight towards the right as opposed to the left.</p>
+<pre class="r"><code>m4.prior &lt;- brm(mvbind(a_1_binary, a_2_binary) ~ (1|p|strata), data = df_long, 
+                  family = bernoulli, sample_prior = &quot;only&quot;, 
+                  chains = 4, cores = 2, 
+                  prior = c(prior(student_t(3, 0, 0.5), class = sd, resp = a1binary), 
+                            prior(student_t(3, 0, 0.5), class = sd, resp = a2binary),
+                  prior(student_t(3, 0, 1), class = Intercept, resp = a1binary),
+                  prior(student_t(3, 2, 1), class = Intercept, resp = a2binary),
+                  prior(lkj(2), class = cor))) 
+saveRDS(m4.prior, here::here(&quot;static&quot;, &quot;files&quot;, &quot;m4_prior.rds&quot;)) </code></pre>
+<p><strong>Visualize the second parameter</strong> - proportion of people giving an opinion</p>
+<pre class="r"><code>posterior_samples(m4.prior) %&gt;%
+  select(b_a2binary_Intercept) %&gt;%
+  mutate(prior_bush = inv_logit_scaled(b_a2binary_Intercept)) %&gt;%
+  ggplot(.,aes(prior_bush)) + geom_density() + 
+  labs(title = &quot;Prior Probability of Giving an Opinion on Average&quot;, 
+       x = &quot;Probability&quot;,y = &quot;Density&quot;)</code></pre>
+<p><img src="/post/multivariate_heirarchical_logistic_BDAexample_files/figure-html/unnamed-chunk-19-1.png" width="672" /></p>
+<pre class="r"><code>tidybayes::add_linpred_draws(newdata = df_long[6, &#39;strata&#39;], m4.prior) %&gt;%
+  filter(.category == &quot;a1binary&quot;) %&gt;%
+  ggplot(.,aes(.value)) + geom_density() + 
+  labs(title = &quot;Probability of Giving an Opinion in Northeast, I&quot;)  </code></pre>
+<p><img src="/post/multivariate_heirarchical_logistic_BDAexample_files/figure-html/unnamed-chunk-19-2.png" width="672" /></p>
+</div>
+</div>
+<div id="posterior-distribution" class="section level3">
+<h3>Posterior Distribution</h3>
+<p>Let’s go ahead with the priors set in model <code>m4.prior</code> - one of the key elements of bayesian analysis is <em>sensitivity analysis</em>. We can change our priors and see how inferences in the posterior distribution change.</p>
+<pre class="r"><code>## posterior 
+m1.posterior &lt;- brm(mvbind(a_1_binary, a_2_binary) ~ (1|p|strata), data = df_long, 
+                  family = bernoulli, 
+                  chains = 4, cores = 4, 
+                  prior = c(prior(student_t(3, 0, 0.5), class = sd, resp = a1binary), 
+                            prior(student_t(3, 0, 0.5), class = sd, resp = a2binary),
+                  prior(student_t(3, 0, 1), class = Intercept, resp = a1binary),
+                  prior(student_t(3, 2, 1), class = Intercept, resp = a2binary),
+                  prior(lkj(2), class = cor))) 
+saveRDS(m1.posterior, here::here(&quot;static&quot;, &quot;files&quot;, &quot;m1_posterior.rds&quot;)) </code></pre>
+<p><strong>Posterior Checks</strong></p>
+<pre class="r"><code>pp_check(m1.posterior, nsamples = 100, resp = &quot;a1binary&quot;)</code></pre>
+<p><img src="/post/multivariate_heirarchical_logistic_BDAexample_files/figure-html/unnamed-chunk-22-1.png" width="672" /></p>
+<pre class="r"><code>pp_check(m1.posterior, nsamples = 100, resp = &quot;a2binary&quot;)  </code></pre>
+<p><img src="/post/multivariate_heirarchical_logistic_BDAexample_files/figure-html/unnamed-chunk-22-2.png" width="672" /></p>
+<pre class="r"><code>new_d &lt;- df_long %&gt;%
+  select(strata) %&gt;%
+  distinct()</code></pre>
+<pre class="r"><code>tidybayes::add_linpred_draws(newdata = new_d, m1.posterior, seed = 123) %&gt;%
+  median_qi() %&gt;%
+  ggplot(., aes(.value, strata)) + geom_pointintervalh() + 
+  facet_wrap(vars(group = .category))  </code></pre>
+<p><img src="/post/multivariate_heirarchical_logistic_BDAexample_files/figure-html/unnamed-chunk-24-1.png" width="672" /></p>
+</div>
+<div id="shrinkage" class="section level3">
+<h3>Shrinkage</h3>
+<p>Model checking doesn’t stop at the posterior predictive checks, one should ALWAYS be skeptical of the model results even if you’re satisfied at that stage. Another valuable tool is to simply compare the raw data estimates with the posterior predictions, and note where the results are different and where they are the same.</p>
+<p>Hierarchical Models “shrink” estimates towards the grand mean, unless there’s strong evidence not to. That in fact is one of the major advantages, as it protects us from concluding groups are different, when in fact they’re not (<em>multiple comparisons discussed in earlier post</em>).</p>
+<p>We see that quite clearly in the plot below - for both estimates, extreme values are <em>shrunk</em> towards the center of the population distribution.</p>
+<p><em>An apple doesn’t fall too far away from the tree, so unless we have strong evidence that it is a peach, we treat it as being from the apple tree closest to it.</em></p>
+<pre class="r"><code>tidybayes::add_linpred_draws(newdata = new_d, m1.posterior, seed = 123) %&gt;%
+  mean_qi() %&gt;%
+  filter(.category == &quot;a1binary&quot;) %&gt;%
+  inner_join(df_raw, by = c(&quot;strata&quot; = &quot;stratum&quot;)) %&gt;%
+  ggplot(., aes(.value, strata)) + geom_pointintervalh() + 
+  geom_point(aes(proportion_bush), color = &quot;red&quot;) + labs(title = &quot;Estimated Proportion Voting for Bush in Each Region&quot;)</code></pre>
+<p><img src="/post/multivariate_heirarchical_logistic_BDAexample_files/figure-html/unnamed-chunk-25-1.png" width="672" /></p>
+<pre class="r"><code>tidybayes::add_linpred_draws(newdata = new_d, m1.posterior, seed = 123) %&gt;%
+  mean_qi() %&gt;%
+  filter(.category == &quot;a2binary&quot;) %&gt;%
+  inner_join(df_raw, by = c(&quot;strata&quot; = &quot;stratum&quot;)) %&gt;%
+  ggplot(., aes(.value, strata)) + geom_pointintervalh() + 
+  geom_point(aes(1 -  proportion_no_opinion), color = &quot;red&quot;) + labs(title = &quot;Estimated Proportion having an opinion&quot;)</code></pre>
+<p><img src="/post/multivariate_heirarchical_logistic_BDAexample_files/figure-html/unnamed-chunk-25-2.png" width="672" /></p>
+<p>The <code>northeast, I</code> region has a lot more shrinkage than the others, which is a cause for concern. At this point, it is imperative to run some checks to ensure the validity of the model. And this will be our topic for the next post! How to check your model fit by looking at the implied posterior predictions.</p>
+</div>
+</div>
+<div id="conclusion" class="section level2">
+<h2>Conclusion</h2>
+<p>This case study isn’t focused on one particular concept, but rather, how different aspects of bayesian inference are used to build models. We saw how even weakly informative priors can have severe consequences on the outcome of interest in the case of generalized linear models. It is imperative to simulate data from you priors and ensure that even if you’re not putting priors that encode your beliefs, they should still lead to an outcome space that is somewhat plausible. It is highly improbable for people to give either candidate a landslide victory, so we should set priors that don’t put all of the mass at the extremes.</p>
+<p>Another takeaway from this was how to implement a multivariate logistic regression in <code>brms</code> - as noted above this is very straightforward to implement, thanks to Paul Berkner. In addition, we saw how modeling the data as a hierarchical structure leads to regularized estimates.</p>
+</div>
